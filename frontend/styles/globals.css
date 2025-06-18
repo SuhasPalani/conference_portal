@@ -1,0 +1,160 @@
+/* globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom fonts from Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap');
+
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: 'Inter', sans-serif; /* Default font */
+  background-color: #0d0c1d; /* Fallback for the darkest background */
+  overflow-x: hidden; /* Prevent horizontal scroll from animations */
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Custom utility classes for fonts */
+.font-inter {
+  font-family: 'Inter', sans-serif;
+}
+
+.font-montserrat {
+  font-family: 'Montserrat', sans-serif;
+}
+
+/* Custom scrollbar hide for the sponsor carousel */
+.scrollbar-hide {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+
+/* Keyframe Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float1 {
+  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+  25% { transform: translateY(-10px) translateX(5px) scale(1.02); }
+  50% { transform: translateY(0) translateX(0) scale(1); }
+  75% { transform: translateY(10px) translateX(-5px) scale(0.98); }
+}
+
+@keyframes float2 {
+  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+  25% { transform: translateY(15px) translateX(-8px) scale(0.97); }
+  50% { transform: translateY(0) translateX(0) scale(1); }
+  75% { transform: translateY(-15px) translateX(8px) scale(1.03); }
+}
+
+@keyframes float3 {
+  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+  25% { transform: translateY(-5px) translateX(10px) scale(1.01); }
+  50% { transform: translateY(0) translateX(0) scale(1); }
+  75% { transform: translateY(5px) translateX(-10px) scale(0.99); }
+}
+
+@keyframes float4 {
+  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+  25% { transform: translateY(8px) translateX(3px) scale(1.02); }
+  50% { transform: translateY(0) translateX(0) scale(1); }
+  75% { transform: translateY(-8px) translateX(-3px) scale(0.98); }
+}
+
+@keyframes float5 {
+  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
+  25% { transform: translateY(-12px) translateX(-6px) scale(0.99); }
+  50% { transform: translateY(0) translateX(0) scale(1); }
+  75% { transform: translateY(12px) translateX(6px) scale(1.01); }
+}
+
+
+/* Animation utilities */
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+.animate-fade-in-down {
+  animation: fadeInDown 0.8s ease-out forwards;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animate-float-1 { animation: float1 15s infinite ease-in-out; }
+.animate-float-2 { animation: float2 17s infinite ease-in-out; }
+.animate-float-3 { animation: float3 13s infinite ease-in-out; }
+.animate-float-4 { animation: float4 16s infinite ease-in-out; }
+.animate-float-5 { animation: float5 14s infinite ease-in-out; }
+
+/* Tailwind overrides for Swiper navigation buttons for better visibility */
+/* These make the default Swiper arrows visible and styled */
+.swiper-button-prev,
+.swiper-button-next {
+  color: var(--tw-text-opacity, #ffffff) !important; /* Make arrows white by default */
+}
+
+/* Ensure the custom class styling on the buttons in SponsorCarousel takes precedence */
+.swiper-button-prev.swiper-button-prev,
+.swiper-button-next.swiper-button-next {
+  @apply !text-purple-400 !bg-gray-800/50 hover:!bg-gray-700/70 !w-10 !h-10 rounded-full flex items-center justify-center;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out; /* Add transition for hover effect */
+}
+
+.swiper-button-prev.swiper-button-prev {
+  left: -2px; /* Adjust position as needed */
+}
+
+.swiper-button-next.swiper-button-next {
+  right: -2px; /* Adjust position as needed */
+}
+
+/* Hide default Swiper pagination dots for more control, if needed (though `pb-12` on Swiper handles it) */
+.swiper-pagination-bullet {
+    background-color: #a78bfa !important; /* Purple for active dot */
+    opacity: 0.5 !important;
+}
+
+.swiper-pagination-bullet-active {
+    opacity: 1 !important;
+    background-color: #8B5CF6 !important; /* Darker purple for active dot */
+}
+
+/* Adjust top padding of main content to account for fixed header */
+main {
+  padding-top: 80px; /* Adjust based on header height */
+}
