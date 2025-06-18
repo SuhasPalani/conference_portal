@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import AuthForm from '../components/AuthForm';
 import { signupUser, getAuthToken } from '../lib/auth';
 import Head from 'next/head';
-import Link from 'next/link'; // Import Link for the logo/header
+import Link from 'next/link'; 
 
 const SignUpPage = () => {
   const router = useRouter();
@@ -29,7 +29,6 @@ const SignUpPage = () => {
       if (data.token) {
         setMessage('Account created successfully! Redirecting...');
         setMessageType('success');
-        // Give a brief moment for the user to see the success message before redirect
         setTimeout(() => {
           router.push('/dashboard');
         }, 1500);
