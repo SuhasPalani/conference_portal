@@ -92,20 +92,19 @@ Before you begin, ensure you have the following installed:
         pip freeze > requirements.txt
         ```
 
-        *Make sure the `requirements.txt` contains at least:*
+            *Make sure the `requirements.txt` contains at least:*
 
-        ```
+
 
     Flask==2.3.2
-    Flask-PyMongo==2.3.0
-    PyJWT==2.8.0
-    Werkzeug==2.3.7
-    python-dotenv==1.0.0
-    pymongo==4.5.0
-    requests==2.31.0
-    Flask-Cors==3.0.10
-
-        ```
+    <br>
+    Flask-PyMongo==2.3.0<br>
+    PyJWT==2.8.0<br>
+    Werkzeug==2.3.7<br>
+    python-dotenv==1.0.0<br>
+    pymongo==4.5.0<br>
+    requests==2.31.0<br>
+    Flask-Cors==3.0.10<br>
 
 ### Configuration
 
