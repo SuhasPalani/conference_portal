@@ -4,15 +4,14 @@
 @tailwind utilities;
 
 /* Custom fonts from Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap');
-
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap");
 
 html,
 body {
   padding: 0;
   margin: 0;
-  font-family: 'Inter', sans-serif; /* Default font */
+  font-family: "Inter", sans-serif; /* Default font */
   background-color: #0d0c1d; /* Fallback for the darkest background */
   overflow-x: hidden; /* Prevent horizontal scroll from animations */
 }
@@ -28,11 +27,11 @@ a {
 
 /* Custom utility classes for fonts */
 .font-inter {
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
 }
 
 .font-montserrat {
-  font-family: 'Montserrat', sans-serif;
+  font-family: "Montserrat", sans-serif;
 }
 
 /* Custom scrollbar hide for the sponsor carousel */
@@ -44,58 +43,119 @@ a {
   display: none; /* Chrome, Safari, Opera */
 }
 
-
 /* Keyframe Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes float1 {
-  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
-  25% { transform: translateY(-10px) translateX(5px) scale(1.02); }
-  50% { transform: translateY(0) translateX(0) scale(1); }
-  75% { transform: translateY(10px) translateX(-5px) scale(0.98); }
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  25% {
+    transform: translateY(-10px) translateX(5px) scale(1.02);
+  }
+  50% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  75% {
+    transform: translateY(10px) translateX(-5px) scale(0.98);
+  }
 }
 
 @keyframes float2 {
-  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
-  25% { transform: translateY(15px) translateX(-8px) scale(0.97); }
-  50% { transform: translateY(0) translateX(0) scale(1); }
-  75% { transform: translateY(-15px) translateX(8px) scale(1.03); }
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  25% {
+    transform: translateY(15px) translateX(-8px) scale(0.97);
+  }
+  50% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  75% {
+    transform: translateY(-15px) translateX(8px) scale(1.03);
+  }
 }
 
 @keyframes float3 {
-  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
-  25% { transform: translateY(-5px) translateX(10px) scale(1.01); }
-  50% { transform: translateY(0) translateX(0) scale(1); }
-  75% { transform: translateY(5px) translateX(-10px) scale(0.99); }
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  25% {
+    transform: translateY(-5px) translateX(10px) scale(1.01);
+  }
+  50% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  75% {
+    transform: translateY(5px) translateX(-10px) scale(0.99);
+  }
 }
 
 @keyframes float4 {
-  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
-  25% { transform: translateY(8px) translateX(3px) scale(1.02); }
-  50% { transform: translateY(0) translateX(0) scale(1); }
-  75% { transform: translateY(-8px) translateX(-3px) scale(0.98); }
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  25% {
+    transform: translateY(8px) translateX(3px) scale(1.02);
+  }
+  50% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  75% {
+    transform: translateY(-8px) translateX(-3px) scale(0.98);
+  }
 }
 
 @keyframes float5 {
-  0%, 100% { transform: translateY(0) translateX(0) scale(1); }
-  25% { transform: translateY(-12px) translateX(-6px) scale(0.99); }
-  50% { transform: translateY(0) translateX(0) scale(1); }
-  75% { transform: translateY(12px) translateX(6px) scale(1.01); }
+  0%,
+  100% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  25% {
+    transform: translateY(-12px) translateX(-6px) scale(0.99);
+  }
+  50% {
+    transform: translateY(0) translateX(0) scale(1);
+  }
+  75% {
+    transform: translateY(12px) translateX(6px) scale(1.01);
+  }
 }
-
 
 /* Animation utilities */
 .animate-fade-in {
@@ -110,17 +170,30 @@ a {
   animation: fadeInUp 0.8s ease-out forwards;
 }
 
-.animate-float-1 { animation: float1 15s infinite ease-in-out; }
-.animate-float-2 { animation: float2 17s infinite ease-in-out; }
-.animate-float-3 { animation: float3 13s infinite ease-in-out; }
-.animate-float-4 { animation: float4 16s infinite ease-in-out; }
-.animate-float-5 { animation: float5 14s infinite ease-in-out; }
+.animate-float-1 {
+  animation: float1 15s infinite ease-in-out;
+}
+.animate-float-2 {
+  animation: float2 17s infinite ease-in-out;
+}
+.animate-float-3 {
+  animation: float3 13s infinite ease-in-out;
+}
+.animate-float-4 {
+  animation: float4 16s infinite ease-in-out;
+}
+.animate-float-5 {
+  animation: float5 14s infinite ease-in-out;
+}
 
 /* Tailwind overrides for Swiper navigation buttons for better visibility */
 /* These make the default Swiper arrows visible and styled */
 .swiper-button-prev,
 .swiper-button-next {
-  color: var(--tw-text-opacity, #ffffff) !important; /* Make arrows white by default */
+  color: var(
+    --tw-text-opacity,
+    #ffffff
+  ) !important; /* Make arrows white by default */
 }
 
 /* Ensure the custom class styling on the buttons in SponsorCarousel takes precedence */
@@ -145,13 +218,13 @@ a {
 
 /* Hide default Swiper pagination dots for more control, if needed (though `pb-12` on Swiper handles it) */
 .swiper-pagination-bullet {
-    background-color: #a78bfa !important; /* Purple for active dot */
-    opacity: 0.5 !important;
+  background-color: #a78bfa !important; /* Purple for active dot */
+  opacity: 0.5 !important;
 }
 
 .swiper-pagination-bullet-active {
-    opacity: 1 !important;
-    background-color: #8B5CF6 !important; /* Darker purple for active dot */
+  opacity: 1 !important;
+  background-color: #8b5cf6 !important; /* Darker purple for active dot */
 }
 
 /* Adjust top padding of main content to account for fixed header */

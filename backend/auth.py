@@ -1,8 +1,8 @@
 import jwt
 import datetime
 from functools import wraps
-from flask import request, jsonify, current_app, g 
-from models import User, BlacklistToken 
+from flask import request, jsonify, current_app, g
+from models import User, BlacklistToken
 
 def encode_auth_token(user_id):
     """
@@ -29,28 +29,28 @@ def decode_auth_token(auth_token):
     """
     Decodes the authentication token.
     :param auth_token: The JWT token string.
-    :return: User ID (string) if valid, or a string message if invalid/expired/blacklisted.
+    :return: User ID (string) if valid, or a dictionary with error details.
     """
     try:
         if BlacklistToken.is_blacklisted(auth_token):
             current_app.logger.warning("Token provided is blacklisted.")
-            return 'Token blacklisted.' 
+            return {'success': False, 'message': 'Token blacklisted.'}
 
         payload = jwt.decode(
             auth_token,
             current_app.config['SECRET_KEY'],
             algorithms=['HS256']
         )
-        return payload['sub'] 
+        return {'success': True, 'user_id': payload['sub']}
     except jwt.ExpiredSignatureError:
         current_app.logger.warning("Token expired.")
-        return 'Signature expired.'
+        return {'success': False, 'message': 'Signature expired.'}
     except jwt.InvalidTokenError:
         current_app.logger.warning("Invalid token.")
-        return 'Invalid token.'
+        return {'success': False, 'message': 'Invalid token.'}
     except Exception as e:
         current_app.logger.error(f"Unexpected error decoding token: {e}")
-        return 'An error occurred during token decoding.'
+        return {'success': False, 'message': 'An error occurred during token decoding.'}
 
 def token_required(f):
     """
@@ -60,18 +60,8 @@ def token_required(f):
     """
     @wraps(f)
     def decorated(*args, **kwargs):
-        # OPTIONS requests are explicitly allowed by the route definition
-        # (e.g., @main_bp.route('/dashboard', methods=['GET', 'OPTIONS']))
-        # The decorator should not try to authenticate them.
-        # It also should NOT call the decorated function `f` directly,
-        # as that function expects `g.current_user` to be set.
-        # Instead, just proceed to the original function for non-OPTIONS,
-        # and let Flask-CORS/the route handle the OPTIONS response.
-        
         if request.method == 'OPTIONS':
-            # For OPTIONS requests, just return without processing token or user
-            # Flask-CORS will add the necessary headers automatically.
-            return f(*args, **kwargs) # Still call f here so route's OPTIONS handler can execute
+            return f(*args, **kwargs)
 
         token = None
         if 'Authorization' in request.headers:
@@ -86,19 +76,20 @@ def token_required(f):
             current_app.logger.warning("Token is missing from Authorization header.")
             return jsonify({'message': 'Token is missing!'}), 401
 
-        user_id_or_message = decode_auth_token(token)
+        # Now decode_auth_token returns a dict
+        decoded_result = decode_auth_token(token)
 
-        if user_id_or_message in ['Token blacklisted.', 'Signature expired.', 'Invalid token.', 'An error occurred during token decoding.']:
-            current_app.logger.error(f"Token validation failed: {user_id_or_message}")
-            return jsonify({'message': user_id_or_message + ' Please log in again.'}), 401
+        if not decoded_result['success']:
+            current_app.logger.error(f"Token validation failed: {decoded_result['message']}")
+            return jsonify({'message': decoded_result['message'] + ' Please log in again.'}), 401
 
-        user_id = user_id_or_message 
+        user_id = decoded_result['user_id']
 
         current_user = User.find_by_id(user_id)
         if not current_user:
             current_app.logger.warning(f"User with ID {user_id} not found after token validation.")
             return jsonify({'message': 'User not found.'}), 401
-        
+
         g.current_user = current_user
 
         return f(*args, **kwargs)

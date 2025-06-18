@@ -1,5 +1,5 @@
-from flask import Blueprint, request, jsonify, current_app, g # Import g
-from models import User, mongo, BlacklistToken # Import BlacklistToken
+from flask import Blueprint, request, jsonify, current_app, g
+from models import User, mongo, BlacklistToken
 from auth import encode_auth_token, token_required, decode_auth_token # Make sure decode_auth_token is imported for dashboard
 import re
 from bson.objectid import ObjectId
@@ -11,19 +11,19 @@ main_bp = Blueprint('main', __name__)
 def signup():
     if request.method == 'OPTIONS':
         return '', 200
-        
+
     try:
         data = request.get_json()
         if not data:
             return jsonify({'message': 'No JSON data provided!'}), 400
-            
+
         full_name = data.get('full_name')
         email = data.get('email')
         password = data.get('password')
 
         if not full_name or not email or not password:
             return jsonify({'message': 'All fields are required!'}), 400
-        
+
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
             return jsonify({'message': 'Invalid email format!'}), 400
 
@@ -35,16 +35,28 @@ def signup():
 
         new_user = User(full_name, email, password)
         user_id = new_user.save()
-        
+
         if not user_id:
             return jsonify({'message': 'Failed to create user.'}), 500
 
         auth_token = encode_auth_token(str(user_id))
         if auth_token:
-            return jsonify({
-                'message': 'User registered successfully!',
-                'token': auth_token
-            }), 201
+            # When signing up, immediately provide user data
+            created_user_doc = User.find_by_id(str(user_id))
+            if created_user_doc:
+                return jsonify({
+                    'message': 'User registered successfully!',
+                    'token': auth_token,
+                    'user': {
+                        'id': str(created_user_doc['_id']),
+                        'full_name': created_user_doc['full_name'],
+                        'email': created_user_doc['email'],
+                        'role': created_user_doc['role']
+                    }
+                }), 201
+            else:
+                current_app.logger.error(f"User {user_id} not found after creation for token generation.")
+                return jsonify({'message': 'User created but failed to retrieve profile.'}), 500
         else:
             current_app.logger.error(f"Failed to generate token for new user {email}")
             return jsonify({'message': 'Failed to generate authentication token.'}), 500
@@ -60,12 +72,12 @@ def signup():
 def login():
     if request.method == 'OPTIONS':
         return '', 200
-        
+
     try:
         data = request.get_json()
         if not data:
             return jsonify({'message': 'No JSON data provided!'}), 400
-            
+
         email = data.get('email')
         password = data.get('password')
 
@@ -92,13 +104,13 @@ def login():
                 return jsonify({'message': 'Failed to generate authentication token.'}), 500
         else:
             return jsonify({'message': 'Incorrect email or password.'}), 401
-            
+
     except Exception as e:
         current_app.logger.error(f"Unexpected error during login: {e}")
         return jsonify({'message': 'An unexpected error occurred during login.'}), 500
 
 @auth_bp.route('/logout', methods=['POST', 'OPTIONS'])
-@token_required # Use the decorator to ensure a valid token is provided
+@token_required
 def logout():
     """
     Handles user logout by blacklisting the provided JWT token.
@@ -109,19 +121,16 @@ def logout():
 
     auth_header = request.headers.get('Authorization')
     if not auth_header:
-        # This case should ideally be caught by token_required, but good to have a fallback
         return jsonify({'message': 'Authorization header is missing!'}), 401
-    
+
     try:
-        token = auth_header.split(' ')[1] # Expected format: 'Bearer <token>'
+        token = auth_header.split(' ')[1]
     except IndexError:
         return jsonify({'message': 'Invalid Authorization header format!'}), 401
 
-    # The token_required decorator already handled token validation and put user in g.current_user.
-    # We just need to blacklist the token that was just used.
     if BlacklistToken.is_blacklisted(token):
-        return jsonify({'message': 'Token already blacklisted.'}), 200 # Idempotent logout
-    
+        return jsonify({'message': 'Token already blacklisted.'}), 200
+
     new_blacklist_token = BlacklistToken(token)
     if new_blacklist_token.save():
         return jsonify({'message': 'Successfully logged out.'}), 200
@@ -130,21 +139,16 @@ def logout():
         return jsonify({'message': 'Failed to blacklist token.'}), 500
 
 @main_bp.route('/dashboard', methods=['GET', 'OPTIONS'])
-@token_required 
+@token_required
 def dashboard():
     """
     Protected endpoint for the user dashboard.
     Requires a valid JWT token.
     """
     if request.method == 'OPTIONS':
-        # Flask-CORS will add the necessary headers.
-        # This branch correctly returns without accessing g.current_user.
-        return '', 200 
-    
-    # For GET requests, if we reach here, token_required has guaranteed 
-    # g.current_user is set because it only allows non-OPTIONS requests
-    # to proceed after successful authentication.
-    user = g.current_user 
+        return '', 200
+
+    user = g.current_user
 
     return jsonify({
         'message': f'Welcome to your dashboard, {user["full_name"]}!',

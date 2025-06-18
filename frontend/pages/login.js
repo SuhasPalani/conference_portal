@@ -1,23 +1,27 @@
 // pages/login.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Import useEffect
 import { useRouter } from 'next/router';
 import AuthForm from '../components/AuthForm';
-import { loginUser, getAuthToken } from '../lib/auth';
+import { loginUser } from '../lib/auth'; // Only need loginUser for the API call
+import { useAuth } from '../contexts/AuthContext'; // Import useAuth hook
 import Head from 'next/head';
-import Link from 'next/link'; // Import Link for the logo/header
+import Link from 'next/link';
 
 const LoginPage = () => {
   const router = useRouter();
+  const { isLoggedIn, login: contextLogin, loadingAuth } = useAuth(); // Get isLoggedIn and the 'login' function from context, rename to avoid clash
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
 
-  // Redirect if already logged in
-  React.useEffect(() => {
-    if (getAuthToken()) {
+  // Redirect if already logged in (using context's isLoggedIn)
+  // Or if still loading auth state, wait
+  useEffect(() => {
+    if (!loadingAuth && isLoggedIn) {
       router.push('/dashboard');
     }
-  }, [router]);
+  }, [isLoggedIn, loadingAuth, router]);
+
 
   const handleLogin = async ({ email, password }) => {
     setIsLoading(true);
@@ -25,16 +29,19 @@ const LoginPage = () => {
     setMessageType('info');
 
     try {
-      const data = await loginUser(email, password);
-      if (data.token) {
+      // Call your API login function from lib/auth
+      const result = await loginUser(email, password); // `result` now contains { success, user, token, message }
+
+      if (result.success) {
+        // If API login was successful, update the AuthContext state
+        contextLogin(result.user, result.token); // Pass user data and token to context's login function
+
         setMessage('Logged in successfully! Redirecting...');
         setMessageType('success');
-        // Give a brief moment for the user to see the success message before redirect
-        setTimeout(() => {
-          router.push('/dashboard');
-        }, 1500);
+        // Redirection will now happen automatically via the useEffect hook
+        // which watches for isLoggedIn state change
       } else {
-        setMessage(data.message || 'Login failed. Please check your credentials.');
+        setMessage(result.message || 'Login failed. Please check your credentials.');
         setMessageType('error');
       }
     } catch (error) {
@@ -46,12 +53,46 @@ const LoginPage = () => {
     }
   };
 
+  // If auth state is still loading, show nothing or a loading spinner to prevent flicker
+  if (loadingAuth) {
+      return (
+          <div className="min-h-screen bg-gradient-to-br from-gray-950 via-indigo-950 to-purple-950 flex items-center justify-center text-white font-inter">
+            <svg
+                className="animate-spin h-10 w-10 text-purple-400"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+            >
+                <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                ></circle>
+                <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+            </svg>
+            <span className="ml-4 text-xl">Loading session...</span>
+          </div>
+      );
+  }
+
+  // Only render the login form if not logged in and not loading
+  if (isLoggedIn) {
+      return null; // Or a redirect message, as the useEffect will handle the actual redirect
+  }
+
+
   return (
     <>
       <Head>
         <title>Login - mAIple Conference Portal</title>
         <meta name="description" content="Log in to your mAIple AI Conference account." />
-        {/* Re-add common fonts for consistency */}
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet" />
       </Head>
