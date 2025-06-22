@@ -22,7 +22,7 @@ const DashboardContent = ({ user, conferenceInfo }) => {
                     </h2>
                     <p className="text-lg text-gray-300 mb-2">
                         <span className="font-medium text-purple-300">Name:</span>{" "}
-                        {user?.full_name || "N/A"}
+                        {user?.fullName || "N/A"}
                     </p>
                     <p className="text-lg text-gray-300 mb-2">
                         <span className="font-medium text-purple-300">Email:</span>{" "}
