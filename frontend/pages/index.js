@@ -129,7 +129,7 @@ const HomePage = () => {
                 // Display user info and dropdown if logged in
                 <li className="relative group ml-4">
                   <button className="text-gray-300 hover:text-white transition duration-200 cursor-pointer text-lg font-medium">
-                    Welcome, {user.full_name.split(" ")[0]}!{" "}
+                    Welcome, {user.fullName.split(" ")[0]}!
                     {/* Display first name */}
                   </button>
                   <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform origin-top-right scale-95 group-hover:scale-100">
