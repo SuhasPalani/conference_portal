@@ -231,3 +231,90 @@ a {
 main {
   padding-top: 80px; /* Adjust based on header height */
 }
+
+
+
+/* Custom Animations */
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Floating background shapes animations */
+@keyframes float1 {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(5px, 10px); }
+  66% { transform: translate(-5px, 5px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes float2 {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(-10px, -5px); }
+  66% { transform: translate(5px, -10px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes float3 {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(10px, -10px); }
+  66% { transform: translate(-5px, 5px); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes float4 {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(-5px, 10px); }
+  66% { transform: translate(10px, -5px); }
+  100% { transform: translate(0, 0); }
+}
+
+
+.animate-fade-in-down {
+  animation: fadeInDown 0.8s ease-out forwards;
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animate-float-1 {
+  animation: float1 15s ease-in-out infinite alternate;
+}
+
+.animate-float-2 {
+  animation: float2 18s ease-in-out infinite alternate-reverse;
+}
+
+.animate-float-3 {
+  animation: float3 12s ease-in-out infinite alternate;
+}
+
+.animate-float-4 {
+  animation: float4 16s ease-in-out infinite alternate-reverse;
+}
+
+/* Base styles for HTML, body */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+}
