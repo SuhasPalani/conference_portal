@@ -1,4 +1,4 @@
-// contexts/AuthContext.js
+// frontend/contexts/AuthContext.js
 import React, {
   createContext,
   useContext,
@@ -6,82 +6,158 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
+import { useRouter } from "next/router";
 import {
   getAuthToken,
-  decodeToken,
+  decodeToken, // This is crucial for consistent user data
   removeAuthToken,
   removeUserData,
-  logoutUser as apiLogoutUser, // The function that clears localStorage and hits backend if needed
-  getUserData,
-  setUserData,
-  setAuthToken,
-} from "../lib/auth";
+  logoutUser as apiLogoutUser, // Renamed to avoid conflict with context's logout
+  setUserData, // Keep setUserData for consistency with local storage
+  setAuthToken, // Keep setAuthToken for consistency with local storage
+} from "../lib/auth"; // Assuming decodeToken, setUserData, setAuthToken are in lib/auth.js
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  // user will be null if not logged in, or an object { ..., token: '...' } if logged in
+  const router = useRouter();
   const [user, setUser] = useState(null);
-  const [loadingAuth, setLoadingAuth] = useState(true); // True initially while checking auth status
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
-  // Derive isLoggedIn from user existence
   const isLoggedIn = !!user;
 
-  // Function to clear local storage and reset state locally
+  // Helper to clear local storage and reset user state
   const clearAuthAndState = useCallback(() => {
     removeAuthToken();
     removeUserData();
     setUser(null);
-    // setIsLoggedIn(false); // Derived, no need to set directly
   }, []);
 
-  // Function to check authentication status on component mount/reload
-  const checkAuthStatus = useCallback(async () => {
-    // Made async for potential async apiLogoutUser
-    setLoadingAuth(true);
-    const token = getAuthToken();
-    const storedUserData = getUserData(); // This should be the parsed user object from localStorage
+  // Centralized function to set user state from a decoded JWT payload
+  // This function is now responsible for getting ALL user data from the token
+  const setAuthUserFromToken = useCallback((token) => {
+  const decoded = decodeToken(token);
+  console.log("🐛 DEBUG: Full decoded token:", decoded);
+  
+  if (decoded) {
+    // Try accessing user data directly from decoded token
+    const userObj = {
+      id: decoded.id || decoded.sub?.id,
+      fullName: decoded.full_name || decoded.sub?.full_name || decoded.fullName,
+      email: decoded.email || decoded.sub?.email,
+      provider: decoded.provider || decoded.sub?.provider,
+      role: decoded.role || decoded.sub?.role,
+    };
+    
+    console.log("🐛 DEBUG: Final userObj:", userObj);
+    
+    setUserData(userObj);
+    setUser({ ...userObj, token });
+    setAuthToken(token);
+    return true;
+  } else {
+    console.error("Decoded token invalid.");
+    clearAuthAndState();
+    return false;
+  }
+}, [clearAuthAndState]);
 
-    if (token && storedUserData) {
-      const decodedToken = decodeToken(token); // This should return null if invalid/expired
-      if (decodedToken) {
-        // If both token is valid AND user data exists, set user and logged in status
-        setUser({ ...storedUserData, token }); // Ensure the token is part of the user object in state
-      } else {
-        // Token is present but invalid/expired, so log out
-        console.warn("Token present but invalid/expired. Logging out.");
-        await apiLogoutUser(); // Ensure local storage is cleared through consolidated logout
-        clearAuthAndState(); // Clear local state after async operation
+  // Function to check authentication status from local storage on load/refresh
+  // This now uses the centralized setAuthUserFromToken
+  const checkAuthStatus = useCallback(async () => {
+    setLoadingAuth(true); // Start loading
+    const token = getAuthToken(); // Retrieve stored token
+
+    if (token) {
+      // Attempt to set user data from the stored token
+      const success = setAuthUserFromToken(token);
+      if (!success) {
+        // If setAuthUserFromToken failed (e.g., invalid token), clear state
+        console.warn("AuthContext: Token present but invalid/expired during startup. Clearing session.");
       }
     } else {
-      // No token or user data found, ensure a clean state
-      console.log("No token or user data found. Ensuring clean state.");
-      clearAuthAndState(); // Always ensure clean state if token/data is missing
+      console.log("AuthContext: No token found during startup. Ensuring clean state.");
+      clearAuthAndState(); // No token, so ensure state is clean
     }
-    setLoadingAuth(false); // Auth status check is complete
-  }, [clearAuthAndState]); // checkAuthStatus depends on clearAuthAndState
+    setLoadingAuth(false); // Finish loading
+  }, [clearAuthAndState, setAuthUserFromToken]); // Dependencies for useCallback
 
+
+  // Effect to run checkAuthStatus once on component mount
+  // This ensures the user is logged in if they have a valid token on page load
   useEffect(() => {
     checkAuthStatus();
-    // No need for window.addEventListener('storage') for now, as it might complicate initial debugging
-    // You can add it back later for multi-tab sync if necessary.
-  }, [checkAuthStatus]); // Run once on mount and when checkAuthStatus memoized function changes
+  }, [checkAuthStatus]); // Re-run if checkAuthStatus changes (which it won't often)
 
-  // Function to handle login (called from login page)
-  const login = useCallback((userData, token) => {
-    // Save to localStorage immediately
-    setAuthToken(token);
-    setUserData(userData);
-    // Update React state
-    setUser({ ...userData, token }); // Store the token with the user object in state
-    setLoadingAuth(false); // Ensure loading is false after login
-  }, []);
+  // Function to perform login and update context state
+  // This now accepts only the token, as all user data is derived from it.
+  const login = useCallback((token) => { // <--- CHANGE IS HERE: ONLY 'token' parameter
+    setLoadingAuth(true); // Indicate loading while processing login
+    const success = setAuthUserFromToken(token); // Use the centralized function
+    if (success) {
+      console.log("AuthContext: User logged in successfully.");
+    } else {
+      console.error("AuthContext: Login failed due to invalid token.");
+      // Optionally, you could handle UI feedback here for failed logins
+    }
+    setLoadingAuth(false); // Finish loading
+  }, [setAuthUserFromToken]); // Dependency for useCallback
 
-  // Function to handle logout (called from any component)
+  // Function to perform logout (client-side and optionally backend)
   const logout = useCallback(async () => {
-    await apiLogoutUser(); // Call the API logout and clear localStorage
-    clearAuthAndState(); // Reset local state
-  }, [apiLogoutUser, clearAuthAndState]); // Depends on apiLogoutUser and clearAuthAndState
+    const result = await apiLogoutUser(); // Call the API logout function (e.g., to blacklist token)
+    if (!result.success) {
+      console.error("Logout error:", result.message);
+      // You might want to display an error to the user here
+    }
+    clearAuthAndState(); // Always clear client-side state regardless of API result
+    router.push("/login"); // Redirect to login page after logout
+  }, [apiLogoutUser, clearAuthAndState, router]); // Dependencies for useCallback
+
+
+  // Effect to handle OAuth redirects: extracts token from URL and logs in
+  useEffect(() => {
+    const handleOAuthRedirect = () => {
+      // Extract only the token and error from the URL query parameters
+      // fullName, email, provider are no longer needed here as they come from the token payload
+      const { token, error } = router.query;
+
+      if (error) {
+        console.error("OAuth Error:", error);
+        // Clean up the URL to remove the error parameter
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('error');
+        router.replace(cleanUrl.pathname, undefined, { shallow: true });
+        return; // Stop execution if there's an error
+      }
+
+      if (token) {
+        console.log("Processing OAuth redirect with token...");
+        login(token); // <--- CHANGE IS HERE: Pass ONLY the token to the context login function
+
+        // Clean up the URL by removing all OAuth-related query parameters
+        // These are legacy params from the backend redirect; we no longer use them for state
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete('token');
+        cleanUrl.searchParams.delete('fullName');
+        cleanUrl.searchParams.delete('email');
+        cleanUrl.searchParams.delete('provider');
+        router.replace(cleanUrl.pathname, undefined, { shallow: true }); // Use replace to avoid browser history issues
+
+        // Redirect to dashboard after successful OAuth login
+        // A small delay can help ensure state updates are fully processed before redirect
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 100);
+      }
+    };
+
+    // Only run this effect if router is ready, user is not already logged in,
+    // and auth state is not currently being loaded (to prevent race conditions/flicker)
+    if (router.isReady && !isLoggedIn && !loadingAuth) {
+      handleOAuthRedirect();
+    }
+  }, [router, login, isLoggedIn, loadingAuth]); // Dependencies for useEffect
 
   return (
     <AuthContext.Provider
@@ -92,6 +168,7 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+// Custom hook to consume the AuthContext
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
