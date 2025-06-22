@@ -1,7 +1,8 @@
-// lib/auth.js
-import {jwt_decode} from 'jwt-decode'; // Import jwt_decode for decoding JWT tokens
+// frontend/lib/auth.js
+import { jwtDecode } from 'jwt-decode'; // Correct import for jwt-decode library
+
 // Backend API URL from environment variables
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const TOKEN_KEY = "token"; // Consistent key for localStorage
 const USER_DATA_KEY = "user_data"; // Key for storing user object
 
@@ -18,7 +19,7 @@ export const setAuthToken = (token) => {
 /**
  * Retrieves the JWT token from local storage.
  * @returns {string | null} The JWT token or null if not found.
- */
+*/
 export const getAuthToken = () => {
   if (typeof window !== 'undefined') {
     return localStorage.getItem(TOKEN_KEY);
@@ -39,7 +40,7 @@ export const decodeToken = (token) => {
   }
   if (!token) {
     console.log("No token provided to decode.");
-    removeAuthToken(); // Clear any stale data
+    removeAuthToken(); // Clear any stale data if token was somehow empty
     removeUserData();
     return null;
   }
@@ -118,8 +119,7 @@ export const removeUserData = () => {
  * Authenticates a user by sending credentials to the backend.
  * @param {string} email
  * @param {string} password
- * @returns {Promise<object>} Response data from the API, including token and user info.
- * Does NOT store token/user data itself.
+ * @returns {Promise<object>} Response data from the API, including success status, user info, token, and message.
  */
 export const loginUser = async (email, password) => {
   try {
@@ -145,20 +145,19 @@ export const loginUser = async (email, password) => {
 
 /**
  * Registers a new user.
- * @param {string} full_name
- * @param {string} email
- * @param {string} password
- * @returns {Promise<object>} Response data from the API, including token and user info.
- * Does NOT store token/user data itself.
+ * @param {string} fullName - The full name of the user (from frontend AuthForm).
+ * @param {string} email - The email of the user.
+ * @param {string} password - The password of the user.
+ * @returns {Promise<object>} Response data from the API, including success status, user info, token, and message.
  */
-export const signupUser = async (full_name, email, password) => {
+export const signupUser = async (fullName, email, password) => {
   try {
-    const response = await fetch(`${BACKEND_URL}/signup`, {
+    const response = await fetch(`${BACKEND_URL}/register`, { // Endpoint should be '/register' as per backend
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ full_name, email, password }),
+      body: JSON.stringify({ fullName, email, password }), // `fullName` matches backend expectation
     });
     const data = await response.json();
     if (response.ok && data.token && data.user) { // Ensure user data is also returned
@@ -174,11 +173,13 @@ export const signupUser = async (full_name, email, password) => {
 
 /**
  * Removes the JWT token and user data from local storage and optionally calls a backend logout endpoint.
+ * @returns {Promise<object>} A success/failure object for the logout operation.
  */
 export const logoutUser = async () => {
   const token = getAuthToken(); // Get the token before removing it
 
   // --- OPTIONAL: Call backend /logout endpoint if you implement blacklisting ---
+  let backendLogoutSuccess = true; // Assume success if no token or backend call skipped/failed gracefully
   if (token) {
     try {
       const response = await fetch(`${BACKEND_URL}/logout`, {
@@ -190,11 +191,13 @@ export const logoutUser = async () => {
       });
       if (!response.ok) {
         console.warn('Backend logout (token blacklisting) failed:', await response.json());
+        backendLogoutSuccess = false;
       } else {
         console.log('Token successfully sent to backend for blacklisting.');
       }
     } catch (error) {
       console.error('Error contacting backend logout endpoint:', error);
+      backendLogoutSuccess = false;
     }
   }
   // --- END OPTIONAL ---
@@ -203,4 +206,54 @@ export const logoutUser = async () => {
   removeAuthToken();
   removeUserData();
   console.log('User token and data removed from localStorage.');
+
+  return { success: backendLogoutSuccess, message: backendLogoutSuccess ? "Logged out successfully." : "Logged out client-side, but backend logout failed." };
+};
+
+/**
+ * Generic API call with authentication.
+ * @param {string} endpoint - The API endpoint relative to BACKEND_URL (e.g., '/dashboard').
+ * @param {string} method - HTTP method (GET, POST, PUT, DELETE).
+ * @param {object} body - Request body for POST/PUT.
+ * @returns {Promise<object>} Object with `success` boolean, `data` (if successful), or `message`/`status` (if failed).
+ */
+export const callApi = async (endpoint, method = 'GET', body = null) => {
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const config = {
+    method,
+    headers,
+  };
+
+  if (body) {
+    config.body = JSON.stringify(body);
+  }
+
+  try {
+    const response = await fetch(`${BACKEND_URL}${endpoint}`, config);
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        // If an API call to a protected endpoint returns 401, it means the token is
+        // likely expired or invalid. You might want to trigger a global logout here
+        // to ensure the user is redirected and local storage cleared.
+        // The AuthContext's checkAuthStatus or logout function would typically handle this.
+        console.warn(`API call to ${endpoint} received 401 Unauthorized. Token might be expired.`);
+      }
+      return { success: false, status: response.status, message: data.message || `API error: ${response.status}` };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    console.error(`Network error calling ${endpoint}:`, error);
+    return { success: false, message: 'Network error or server unavailable.' };
+  }
 };
