@@ -1,14 +1,17 @@
-from flask import Blueprint, request, jsonify, current_app, g
-from models import User, mongo, BlacklistToken
-from auth import encode_auth_token, token_required, decode_auth_token # Make sure decode_auth_token is imported for dashboard
+# backend/routes.py
+from flask import Blueprint, request, jsonify, redirect, url_for, current_app, g
+from models import User, mongo, BlacklistToken # Import mongo for blacklist check
+from auth import oauth, handle_oauth_callback, jwt # Import jwt from auth
+# Corrected import: add get_jwt
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, get_jwt # <-- ADD THIS IMPORT
 import re
 from bson.objectid import ObjectId
 
-auth_bp = Blueprint('auth', __name__)
-main_bp = Blueprint('main', __name__)
+api_bp = Blueprint('api', __name__, url_prefix='/api')
 
-@auth_bp.route('/signup', methods=['POST', 'OPTIONS'])
-def signup():
+# --- Authentication Routes (Email/Password) ---
+@api_bp.route('/register', methods=['POST', 'OPTIONS'])
+def register():
     if request.method == 'OPTIONS':
         return '', 200
 
@@ -17,11 +20,11 @@ def signup():
         if not data:
             return jsonify({'message': 'No JSON data provided!'}), 400
 
-        full_name = data.get('full_name')
+        full_name = data.get('fullName') # Frontend sends fullName
         email = data.get('email')
         password = data.get('password')
 
-        if not full_name or not email or not password:
+        if not all([full_name, email, password]):
             return jsonify({'message': 'All fields are required!'}), 400
 
         if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
@@ -33,42 +36,29 @@ def signup():
         if User.find_by_email(email):
             return jsonify({'message': 'User with this email already exists.'}), 409
 
-        new_user = User(full_name, email, password)
-        user_id = new_user.save()
+        new_user = User(full_name, email, password, provider='email') # Specify provider
+        user_id = new_user.save() # This also sets new_user._id
 
         if not user_id:
+            current_app.logger.error(f"Failed to save new user for email: {email}")
             return jsonify({'message': 'Failed to create user.'}), 500
 
-        auth_token = encode_auth_token(str(user_id))
-        if auth_token:
-            # When signing up, immediately provide user data
-            created_user_doc = User.find_by_id(str(user_id))
-            if created_user_doc:
-                return jsonify({
-                    'message': 'User registered successfully!',
-                    'token': auth_token,
-                    'user': {
-                        'id': str(created_user_doc['_id']),
-                        'full_name': created_user_doc['full_name'],
-                        'email': created_user_doc['email'],
-                        'role': created_user_doc['role']
-                    }
-                }), 201
-            else:
-                current_app.logger.error(f"User {user_id} not found after creation for token generation.")
-                return jsonify({'message': 'User created but failed to retrieve profile.'}), 500
-        else:
-            current_app.logger.error(f"Failed to generate token for new user {email}")
-            return jsonify({'message': 'Failed to generate authentication token.'}), 500
+        # Generate JWT for the newly registered user
+        access_token = create_access_token(identity=new_user.to_dict())
+        return jsonify({
+            'message': 'User registered successfully!',
+            'token': access_token,
+            'user': new_user.to_dict()
+        }), 201
 
     except ValueError as e:
         current_app.logger.error(f"Signup validation error: {e}")
         return jsonify({'message': str(e)}), 400
     except Exception as e:
-        current_app.logger.error(f"Unexpected error during signup for {email if 'email' in locals() else 'unknown'}: {e}")
+        current_app.logger.error(f"Unexpected error during signup for {email if 'email' in locals() else 'unknown'}: {e}", exc_info=True)
         return jsonify({'message': 'An unexpected error occurred during signup.'}), 500
 
-@auth_bp.route('/login', methods=['POST', 'OPTIONS'])
+@api_bp.route('/login', methods=['POST', 'OPTIONS'])
 def login():
     if request.method == 'OPTIONS':
         return '', 200
@@ -86,60 +76,48 @@ def login():
 
         user = User.find_by_email(email)
 
-        if user and User.check_password(user['password'], password):
-            auth_token = encode_auth_token(str(user['_id']))
-            if auth_token:
-                return jsonify({
-                    'message': 'Logged in successfully!',
-                    'token': auth_token,
-                    'user': {
-                        'id': str(user['_id']),
-                        'full_name': user['full_name'],
-                        'email': user['email'],
-                        'role': user['role']
-                    }
-                }), 200
-            else:
-                current_app.logger.error(f"Failed to generate token for existing user {email}")
-                return jsonify({'message': 'Failed to generate authentication token.'}), 500
-        else:
+        # Check if user exists and if it's an email/password user
+        if not user or user.provider != 'email' or not user.check_password(password):
             return jsonify({'message': 'Incorrect email or password.'}), 401
 
+        # Generate JWT for the logged-in user
+        access_token = create_access_token(identity=user.to_dict())
+        return jsonify({
+            'message': 'Logged in successfully!',
+            'token': access_token,
+            'user': user.to_dict()
+        }), 200
+
     except Exception as e:
-        current_app.logger.error(f"Unexpected error during login: {e}")
+        current_app.logger.error(f"Unexpected error during login for {email if 'email' in locals() else 'unknown'}: {e}", exc_info=True)
         return jsonify({'message': 'An unexpected error occurred during login.'}), 500
 
-@auth_bp.route('/logout', methods=['POST', 'OPTIONS'])
-@token_required
+@api_bp.route('/logout', methods=['POST', 'OPTIONS'])
+@jwt_required() # Protect this route with Flask-JWT-Extended
 def logout():
     """
-    Handles user logout by blacklisting the provided JWT token.
+    Handles user logout by blacklisting the provided JWT token's JTI.
     Requires a valid JWT token in the Authorization header.
     """
     if request.method == 'OPTIONS':
         return '', 200
 
-    auth_header = request.headers.get('Authorization')
-    if not auth_header:
-        return jsonify({'message': 'Authorization header is missing!'}), 401
-
     try:
-        token = auth_header.split(' ')[1]
-    except IndexError:
-        return jsonify({'message': 'Invalid Authorization header format!'}), 401
+        token_payload = get_jwt() # Get the entire payload
+        jti = token_payload["jti"]
+    except Exception as e:
+        current_app.logger.error(f"Could not extract JTI for logout: {e}", exc_info=True)
+        return jsonify({'message': 'Could not process logout. Invalid token.'}), 400
 
-    if BlacklistToken.is_blacklisted(token):
-        return jsonify({'message': 'Token already blacklisted.'}), 200
-
-    new_blacklist_token = BlacklistToken(token)
+    new_blacklist_token = BlacklistToken(jti) # Blacklist the JTI
     if new_blacklist_token.save():
         return jsonify({'message': 'Successfully logged out.'}), 200
     else:
-        current_app.logger.error(f"Failed to blacklist token: {token}")
+        current_app.logger.error(f"Failed to blacklist token JTI: {jti}")
         return jsonify({'message': 'Failed to blacklist token.'}), 500
 
-@main_bp.route('/dashboard', methods=['GET', 'OPTIONS'])
-@token_required
+@api_bp.route('/dashboard', methods=['GET', 'OPTIONS'])
+@jwt_required() # Protect this route with Flask-JWT-Extended
 def dashboard():
     """
     Protected endpoint for the user dashboard.
@@ -148,22 +126,61 @@ def dashboard():
     if request.method == 'OPTIONS':
         return '', 200
 
-    user = g.current_user
+    # get_jwt_identity() will return the dictionary we passed as identity when creating the token
+    current_user_data = get_jwt_identity()
+    user_id = current_user_data.get('id')
+
+    user = User.find_by_id(user_id) # Fetch full user object from DB if needed, or rely on JWT data
+
+    if not user:
+        return jsonify({'message': 'User not found.'}), 404
+
+    conference_info = {
+        "title": "mAIple Global AI Conference 2025",
+        "date": "October 26-28, 2025",
+        "location": "Virtual & Chicago, IL",
+        "description": "Explore the cutting edge of Artificial Intelligence. Featuring leading experts, groundbreaking research, and interactive workshops.",
+        "tracks": [
+            "Generative AI & LLMs",
+            "AI Ethics & Governance",
+            "AI in Healthcare",
+            "Robotics & Automation",
+            "Computer Vision",
+            "Natural Language Processing",
+        ],
+        "participationTimelines": "Early Bird Registration ends August 15, 2025. Speaker applications close July 30, 2025.",
+    }
 
     return jsonify({
-        'message': f'Welcome to your dashboard, {user["full_name"]}!',
-        'user': {
-            'id': str(user['_id']),
-            'full_name': user['full_name'],
-            'email': user['email'],
-            'role': user['role']
-        },
-        'conferenceInfo': {
-            'title': 'AI Conference 2025: Shaping the Future',
-            'date': 'October 26-28, 2025',
-            'location': 'Virtual & Chicago, IL',
-            'description': 'Join leading experts in Artificial Intelligence to explore the latest advancements, research, and applications across various domains.',
-            'tracks': ['Machine Learning', 'Deep Learning', 'Natural Language Processing', 'Computer Vision', 'AI Ethics'],
-            'participationTimelines': 'Registration: Sep 1 - Oct 15 | Abstract Submission: Jul 1 - Aug 31 | Speaker Announcements: Sep 20'
-        }
+        'message': f"Welcome to your dashboard, {user.full_name}!",
+        'user': user.to_dict(), # Use the to_dict method from the User object
+        'conferenceInfo': conference_info
     }), 200
+
+# --- OAuth Routes ---
+@api_bp.route('/auth/google', methods=['GET'])
+def google_auth():
+    redirect_uri = url_for('api.google_callback', _external=True)
+    return oauth.google.authorize_redirect(redirect_uri)
+
+@api_bp.route('/auth/google/callback', methods=['GET'])
+def google_callback():
+    return handle_oauth_callback('google', oauth.google)
+
+@api_bp.route('/auth/microsoft', methods=['GET'])
+def microsoft_auth():
+    redirect_uri = url_for('api.microsoft_callback', _external=True)
+    return oauth.microsoft.authorize_redirect(redirect_uri)
+
+@api_bp.route('/auth/microsoft/callback', methods=['GET'])
+def microsoft_callback():
+    return handle_oauth_callback('microsoft', oauth.microsoft)
+
+@api_bp.route('/auth/linkedin', methods=['GET'])
+def linkedin_auth():
+    redirect_uri = url_for('api.linkedin_callback', _external=True)
+    return oauth.linkedin.authorize_redirect(redirect_uri)
+
+@api_bp.route('/auth/linkedin/callback', methods=['GET'])
+def linkedin_callback():
+    return handle_oauth_callback('linkedin', oauth.linkedin)
