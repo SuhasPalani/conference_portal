@@ -1,15 +1,18 @@
 // pages/login.js
-import React, { useState, useEffect } from "react"; 
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import AuthForm from "../components/AuthForm";
-import { loginUser } from "../lib/auth"; 
+import AuthForm from "../components/AuthForm"; // Correct path to AuthForm
+import { loginUser } from "../lib/auth"; // Assuming loginUser is here
 import { useAuth } from "../contexts/AuthContext";
 import Head from "next/head";
 import Link from "next/link";
 
+// Make sure this matches your backend's base URL for API
+const BACKEND_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+
 const LoginPage = () => {
   const router = useRouter();
-  const { isLoggedIn, login: contextLogin, loadingAuth } = useAuth(); 
+  const { isLoggedIn, login: contextLogin, loadingAuth } = useAuth(); // Renamed login to contextLogin to avoid conflict
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("info");
@@ -27,16 +30,16 @@ const LoginPage = () => {
     setMessageType("info");
 
     try {
-      // Call your API login function from lib/auth
-      const result = await loginUser(email, password); 
+      const result = await loginUser(email, password); // This still returns { user, token }
 
       if (result.success) {
-        
-        contextLogin(result.user, result.token); 
+        // --- CRUCIAL CHANGE HERE ---
+        contextLogin(result.token); // Pass ONLY the token to AuthContext's login function
+        // The AuthContext will now decode the token and set the full user object (including role and full_name)
+        // --- END CRUCIAL CHANGE ---
 
         setMessage("Logged in successfully! Redirecting...");
         setMessageType("success");
-        
       } else {
         setMessage(
           result.message || "Login failed. Please check your credentials."
@@ -52,7 +55,6 @@ const LoginPage = () => {
     }
   };
 
-  // If auth state is still loading, show nothing or a loading spinner to prevent flicker
   if (loadingAuth) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-indigo-950 to-purple-950 flex items-center justify-center text-white font-inter">
@@ -81,9 +83,8 @@ const LoginPage = () => {
     );
   }
 
-  // Only render the login form if not logged in and not loading
   if (isLoggedIn) {
-    return null; 
+    return null;
   }
 
   return (
@@ -105,7 +106,6 @@ const LoginPage = () => {
       </Head>
 
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-indigo-950 to-purple-950 text-white font-inter flex flex-col justify-center items-center py-12 px-4 sm:px-6 lg:px-8">
-        {/* Header/Logo (consistent with index.js) */}
         <header className="absolute top-0 left-0 w-full py-6 px-8 lg:px-20 flex justify-between items-center z-20 animate-fade-in-down">
           <Link
             href="/"
@@ -113,7 +113,7 @@ const LoginPage = () => {
           >
             mAIple
           </Link>
-         
+
           <Link
             href="/"
             className="text-gray-300 hover:text-white transition duration-300 transform hover:scale-105 text-lg font-semibold"
@@ -122,9 +122,7 @@ const LoginPage = () => {
           </Link>
         </header>
 
-        {/* Content Area with background shapes */}
         <div className="relative w-full max-w-md mx-auto z-10 p-8 rounded-xl shadow-2xl bg-gray-900 bg-opacity-70 backdrop-filter backdrop-blur-lg border border-gray-800 animate-fade-in-up">
-          {/* Background shapes - subtle, could be more or less complex */}
           <div className="absolute inset-0 z-0 opacity-15 overflow-hidden rounded-xl">
             <svg
               className="w-full h-full"
@@ -216,6 +214,61 @@ const LoginPage = () => {
             message={message}
             messageType={messageType}
           />
+
+          {/* Social Login Buttons - Added here */}
+          <div className="mt-6 relative z-20">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-700"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-gray-900 bg-opacity-70 text-gray-400">
+                  Or continue with
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-3">
+              {/* Google Login */}
+              <a
+                href={`${BACKEND_API_BASE_URL}/auth/google`}
+                className="w-full flex items-center justify-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-300"
+              >
+                <img
+                  src="https://img.icons8.com/color/16/000000/google-logo.png" // Google icon
+                  alt="Google"
+                  className="mr-2"
+                />
+                Sign in with Google
+              </a>
+
+              {/* Microsoft Login */}
+              <a
+                href={`${BACKEND_API_BASE_URL}/auth/microsoft`}
+                className="w-full flex items-center justify-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-300"
+              >
+                <img
+                  src="https://img.icons8.com/color/16/000000/microsoft.png" // Microsoft icon
+                  alt="Microsoft"
+                  className="mr-2"
+                />
+                Sign in with Microsoft
+              </a>
+
+              {/* LinkedIn Login */}
+              <a
+                href={`${BACKEND_API_BASE_URL}/auth/linkedin`}
+                className="w-full flex items-center justify-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-300"
+              >
+                <img
+                  src="https://img.icons8.com/color/16/000000/linkedin.png" // LinkedIn icon
+                  alt="LinkedIn"
+                  className="mr-2"
+                />
+                Sign in with LinkedIn
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </>
