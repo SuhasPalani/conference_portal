@@ -1,13 +1,15 @@
-// pages/dashboard.js
+// frontend/pages/dashboard.js
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "../contexts/AuthContext";
+import { callApi } from "../lib/auth"; // Import callApi from your auth library
 import DashboardLayout from "../components/Layout/DashboardLayout";
 import DashboardContent from "../components/DashboardContent";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
+// REMOVE THIS LINE: The BACKEND_URL constant is no longer needed directly in dashboard.js
+// const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 const DashboardPage = () => {
   const router = useRouter();
@@ -36,34 +38,26 @@ const DashboardPage = () => {
       setError(""); // Clear previous errors
 
       try {
-        // Ensure user object and user.token are present before making API call
-        if (!user || !user.token) {
-          console.error(
-            "User or token missing in AuthContext, initiating logout."
-          );
+        // Ensure user object is present before making API call
+        // The token check `user.token` is handled internally by `callApi` via `getAuthToken()`
+        if (!user) {
+          console.error("User missing in AuthContext, initiating logout.");
           logout(); // Use the logout from context
           router.replace("/");
           return;
         }
 
-        const response = await fetch(`${BACKEND_URL}/dashboard`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${user.token}`, // Get token from the user object in context
-          },
-        });
+        // Use the callApi function imported from lib/auth.js
+        const response = await callApi('/dashboard', 'GET');
 
-        if (response.ok) {
-          const data = await response.json();
-          setConferenceInfo(data.conferenceInfo);
+        if (response.success) {
+          setConferenceInfo(response.data.conferenceInfo); // Access data from response.data
         } else {
-          const errorData = await response.json();
-          setError(errorData.message || "Failed to fetch dashboard data.");
+          // If API call was not successful
+          setError(response.message || "Failed to fetch dashboard data.");
+          // Handle specific status codes (e.g., 401 Unauthorized, 403 Forbidden)
           if (response.status === 401 || response.status === 403) {
-            console.log(
-              "401/403 Unauthorized for dashboard data, clearing token and redirecting."
-            );
+            console.log("401/403 Unauthorized for dashboard data, clearing token and redirecting.");
             logout(); // Call the consolidated logout function from context
             router.replace("/");
           }
@@ -97,6 +91,7 @@ const DashboardPage = () => {
     return <ErrorMessage message={error} />;
   }
 
+  // Ensure user and conferenceInfo are available before rendering DashboardContent
   if (!user || !conferenceInfo) {
     return (
       <ErrorMessage
