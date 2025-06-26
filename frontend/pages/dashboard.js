@@ -8,9 +8,6 @@ import DashboardContent from "../components/DashboardContent";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 
-// REMOVE THIS LINE: The BACKEND_URL constant is no longer needed directly in dashboard.js
-// const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
-
 const DashboardPage = () => {
   const router = useRouter();
   const { user, isLoggedIn, loadingAuth, logout } = useAuth(); // Destructure from useAuth
@@ -39,7 +36,6 @@ const DashboardPage = () => {
 
       try {
         // Ensure user object is present before making API call
-        // The token check `user.token` is handled internally by `callApi` via `getAuthToken()`
         if (!user) {
           console.error("User missing in AuthContext, initiating logout.");
           logout(); // Use the logout from context
@@ -48,7 +44,7 @@ const DashboardPage = () => {
         }
 
         // Use the callApi function imported from lib/auth.js
-        const response = await callApi('/dashboard', 'GET');
+        const response = await callApi("/dashboard", "GET");
 
         if (response.success) {
           setConferenceInfo(response.data.conferenceInfo); // Access data from response.data
@@ -57,7 +53,9 @@ const DashboardPage = () => {
           setError(response.message || "Failed to fetch dashboard data.");
           // Handle specific status codes (e.g., 401 Unauthorized, 403 Forbidden)
           if (response.status === 401 || response.status === 403) {
-            console.log("401/403 Unauthorized for dashboard data, clearing token and redirecting.");
+            console.log(
+              "401/403 Unauthorized for dashboard data, clearing token and redirecting."
+            );
             logout(); // Call the consolidated logout function from context
             router.replace("/");
           }
@@ -107,6 +105,7 @@ const DashboardPage = () => {
       title="Dashboard - mAIple Conference Portal"
       description="Your personal mAIple AI Conference dashboard."
     >
+      {/* Pass user object and conferenceInfo to DashboardContent */}
       <DashboardContent user={user} conferenceInfo={conferenceInfo} />
     </DashboardLayout>
   );

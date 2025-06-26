@@ -1,7 +1,8 @@
 // frontend/lib/auth.js
-import { jwtDecode } from 'jwt-decode'; // Correct import for jwt-decode library
+import { jwtDecode } from "jwt-decode"; // Correct import for jwt-decode library
 
 // Backend API URL from environment variables
+// Ensure NEXT_PUBLIC_API_BASE_URL is defined in your .env.local file (e.g., NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api)
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const TOKEN_KEY = "token"; // Consistent key for localStorage
 const USER_DATA_KEY = "user_data"; // Key for storing user object
@@ -11,7 +12,8 @@ const USER_DATA_KEY = "user_data"; // Key for storing user object
  * @param {string} token - The JWT token.
  */
 export const setAuthToken = (token) => {
-  if (typeof window !== 'undefined') { // Check if running in browser
+  if (typeof window !== "undefined") {
+    // Check if running in browser
     localStorage.setItem(TOKEN_KEY, token);
   }
 };
@@ -19,9 +21,9 @@ export const setAuthToken = (token) => {
 /**
  * Retrieves the JWT token from local storage.
  * @returns {string | null} The JWT token or null if not found.
-*/
+ */
 export const getAuthToken = () => {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     return localStorage.getItem(TOKEN_KEY);
   }
   return null;
@@ -35,7 +37,7 @@ export const getAuthToken = () => {
  * @returns {object | null} Decoded payload or null if invalid or expired.
  */
 export const decodeToken = (token) => {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return null;
   }
   if (!token) {
@@ -46,31 +48,32 @@ export const decodeToken = (token) => {
   }
 
   try {
-    const decoded = jwtDecode(token); // Use jwtDecode directly
+    const decoded = jwtDecode(token);
+    console.log("Decoded JWT payload:", decoded); // <-- ADD THIS LINE FOR DEBUGGING
     const currentTime = Date.now() / 1000;
 
     if (decoded.exp < currentTime) {
-      console.log('Token expired.');
+      console.log("Token expired.");
       removeAuthToken();
       removeUserData();
       return null;
     }
     return decoded;
   } catch (error) {
-    console.error('Failed to decode token:', error);
-    removeAuthToken(); // Clear on decoding error as well
+    console.error("Failed to decode token:", error);
+    removeAuthToken();
     removeUserData();
     return null;
   }
 };
 
 /**
- * Stores the user data (e.g., full_name, email) in local storage.
+ * Stores the user data (e.g., full_name, email, interests) in local storage.
  * This is typically received from the login/signup API response.
  * @param {object} userData - The user object.
  */
 export const setUserData = (userData) => {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     try {
       localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
     } catch (e) {
@@ -84,7 +87,7 @@ export const setUserData = (userData) => {
  * @returns {object | null} The user object or null if not found.
  */
 export const getUserData = () => {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     try {
       const data = localStorage.getItem(USER_DATA_KEY);
       return data ? JSON.parse(data) : null;
@@ -100,7 +103,7 @@ export const getUserData = () => {
  * Removes the JWT token from local storage.
  */
 export const removeAuthToken = () => {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     localStorage.removeItem(TOKEN_KEY);
   }
 };
@@ -109,11 +112,10 @@ export const removeAuthToken = () => {
  * Removes the user data from local storage.
  */
 export const removeUserData = () => {
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     localStorage.removeItem(USER_DATA_KEY);
   }
 };
-
 
 /**
  * Authenticates a user by sending credentials to the backend.
@@ -124,22 +126,31 @@ export const removeUserData = () => {
 export const loginUser = async (email, password) => {
   try {
     const response = await fetch(`${BACKEND_URL}/login`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ email, password }),
     });
     const data = await response.json();
-    if (response.ok && data.token && data.user) { // Ensure user data is also returned
-      return { success: true, user: data.user, token: data.token, message: "Login successful!" };
+    // The 'user' object in data should now contain 'interests' if backend sends it.
+    if (response.ok && data.token && data.user) {
+      return {
+        success: true,
+        user: data.user,
+        token: data.token,
+        message: "Login successful!",
+      };
     } else {
-      // If response not ok or missing token/user, it's a login failure
-      return { success: false, message: data.message || 'Login failed: Invalid credentials or server error.' };
+      return {
+        success: false,
+        message:
+          data.message || "Login failed: Invalid credentials or server error.",
+      };
     }
   } catch (error) {
     console.error("Network error during login:", error);
-    return { success: false, message: 'Network error or server unavailable.' };
+    return { success: false, message: "Network error or server unavailable." };
   }
 };
 
@@ -152,22 +163,32 @@ export const loginUser = async (email, password) => {
  */
 export const signupUser = async (fullName, email, password) => {
   try {
-    const response = await fetch(`${BACKEND_URL}/register`, { // Endpoint should be '/register' as per backend
-      method: 'POST',
+    const response = await fetch(`${BACKEND_URL}/register`, {
+      // Endpoint should be '/register' as per backend
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({ fullName, email, password }), // `fullName` matches backend expectation
     });
     const data = await response.json();
-    if (response.ok && data.token && data.user) { // Ensure user data is also returned
-      return { success: true, user: data.user, token: data.token, message: "Signup successful!" };
+    // The 'user' object in data should now contain 'interests' (likely empty array initially).
+    if (response.ok && data.token && data.user) {
+      return {
+        success: true,
+        user: data.user,
+        token: data.token,
+        message: "Signup successful!",
+      };
     } else {
-      return { success: false, message: data.message || 'Signup failed: Please try again.' };
+      return {
+        success: false,
+        message: data.message || "Signup failed: Please try again.",
+      };
     }
   } catch (error) {
     console.error("Network error during signup:", error);
-    return { success: false, message: 'Network error or server unavailable.' };
+    return { success: false, message: "Network error or server unavailable." };
   }
 };
 
@@ -183,20 +204,23 @@ export const logoutUser = async () => {
   if (token) {
     try {
       const response = await fetch(`${BACKEND_URL}/logout`, {
-        method: 'POST', // Or 'DELETE', depending on your backend API design
+        method: "POST", // Or 'DELETE', depending on your backend API design
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // Send the token to be blacklisted
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // Send the token to be blacklisted
         },
       });
       if (!response.ok) {
-        console.warn('Backend logout (token blacklisting) failed:', await response.json());
+        console.warn(
+          "Backend logout (token blacklisting) failed:",
+          await response.json()
+        );
         backendLogoutSuccess = false;
       } else {
-        console.log('Token successfully sent to backend for blacklisting.');
+        console.log("Token successfully sent to backend for blacklisting.");
       }
     } catch (error) {
-      console.error('Error contacting backend logout endpoint:', error);
+      console.error("Error contacting backend logout endpoint:", error);
       backendLogoutSuccess = false;
     }
   }
@@ -205,9 +229,14 @@ export const logoutUser = async () => {
   // Crucially, always clear client-side storage regardless of backend logout success
   removeAuthToken();
   removeUserData();
-  console.log('User token and data removed from localStorage.');
+  console.log("User token and data removed from localStorage.");
 
-  return { success: backendLogoutSuccess, message: backendLogoutSuccess ? "Logged out successfully." : "Logged out client-side, but backend logout failed." };
+  return {
+    success: backendLogoutSuccess,
+    message: backendLogoutSuccess
+      ? "Logged out successfully."
+      : "Logged out client-side, but backend logout failed.",
+  };
 };
 
 /**
@@ -217,14 +246,14 @@ export const logoutUser = async () => {
  * @param {object} body - Request body for POST/PUT.
  * @returns {Promise<object>} Object with `success` boolean, `data` (if successful), or `message`/`status` (if failed).
  */
-export const callApi = async (endpoint, method = 'GET', body = null) => {
+export const callApi = async (endpoint, method = "GET", body = null) => {
   const token = getAuthToken();
   const headers = {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   };
 
   if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers["Authorization"] = `Bearer ${token}`;
   }
 
   const config = {
@@ -242,18 +271,64 @@ export const callApi = async (endpoint, method = 'GET', body = null) => {
 
     if (!response.ok) {
       if (response.status === 401) {
-        // If an API call to a protected endpoint returns 401, it means the token is
-        // likely expired or invalid. You might want to trigger a global logout here
-        // to ensure the user is redirected and local storage cleared.
-        // The AuthContext's checkAuthStatus or logout function would typically handle this.
-        console.warn(`API call to ${endpoint} received 401 Unauthorized. Token might be expired.`);
+        console.warn(
+          `API call to ${endpoint} received 401 Unauthorized. Token might be expired.`
+        );
+        // In a real application, you might want to trigger a logout here
+        // or a token refresh if you have a refresh token mechanism.
       }
-      return { success: false, status: response.status, message: data.message || `API error: ${response.status}` };
+      return {
+        success: false,
+        status: response.status,
+        message: data.message || `API error: ${response.status}`,
+      };
     }
 
     return { success: true, data };
   } catch (error) {
     console.error(`Network error calling ${endpoint}:`, error);
-    return { success: false, message: 'Network error or server unavailable.' };
+    return { success: false, message: "Network error or server unavailable." };
+  }
+};
+
+/**
+ * Updates a user's interests on the backend.
+ * @param {string} userId - The ID of the user to update.
+ * @param {string[]} interests - An array of strings representing the user's interests.
+ * @returns {Promise<object>} Response data from the API.
+ */
+export const updateUserInterests = async (userId, interests) => {
+  const token = getAuthToken(); // Use the getAuthToken helper for consistency
+  if (!token) {
+    return { success: false, message: "Authentication token missing." };
+  }
+
+  try {
+    const response = await fetch(
+      `${BACKEND_URL}/users/${userId}/interests`, // Corrected template literal for URL
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ interests }),
+      }
+    );
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to update interests.");
+    }
+    return {
+      success: true,
+      message: data.message || "Interests updated successfully.",
+    };
+  } catch (error) {
+    console.error("Error updating interests:", error);
+    return {
+      success: false,
+      message: error.message || "An unexpected error occurred.",
+    };
   }
 };
