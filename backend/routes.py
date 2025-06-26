@@ -1,9 +1,16 @@
 # backend/routes.py
 from flask import Blueprint, request, jsonify, redirect, url_for, current_app, g
 from models import User, mongo, BlacklistToken # Import mongo for blacklist check
-from auth import oauth, handle_oauth_callback, jwt # Import jwt from auth
-# Corrected import: add get_jwt
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity, unset_jwt_cookies, get_jwt # <-- ADD THIS IMPORT
+from auth import oauth, handle_oauth_callback # Removed direct jwt import from auth; using flask_jwt_extended directly
+# Corrected import: ensure all necessary Flask-JWT-Extended functions are imported
+from flask_jwt_extended import (
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+    unset_jwt_cookies,
+    get_jwt, # <-- KEEP THIS IMPORT
+    decode_token # Added decode_token
+)
 import re
 from bson.objectid import ObjectId
 
@@ -33,22 +40,25 @@ def register():
         if len(password) < 8:
             return jsonify({'message': 'Password must be at least 8 characters long!'}), 400
 
-        if User.find_by_email(email):
+        # Check for existing user by email
+        existing_user = User.find_by_email(email)
+        if existing_user:
             return jsonify({'message': 'User with this email already exists.'}), 409
 
-        new_user = User(full_name, email, password, provider='email') # Specify provider
+        # When registering, interests can be an empty list initially
+        new_user = User(full_name, email, password, provider='email', interests=[])
         user_id = new_user.save() # This also sets new_user._id
 
         if not user_id:
             current_app.logger.error(f"Failed to save new user for email: {email}")
             return jsonify({'message': 'Failed to create user.'}), 500
 
-        # Generate JWT for the newly registered user
+        # Generate JWT for the newly registered user (to_dict includes interests)
         access_token = create_access_token(identity=new_user.to_dict())
         return jsonify({
             'message': 'User registered successfully!',
             'token': access_token,
-            'user': new_user.to_dict()
+            'user': new_user.to_dict() # This now includes the 'interests' field
         }), 201
 
     except ValueError as e:
@@ -80,12 +90,12 @@ def login():
         if not user or user.provider != 'email' or not user.check_password(password):
             return jsonify({'message': 'Incorrect email or password.'}), 401
 
-        # Generate JWT for the logged-in user
+        # Generate JWT for the logged-in user (to_dict includes interests)
         access_token = create_access_token(identity=user.to_dict())
         return jsonify({
             'message': 'Logged in successfully!',
             'token': access_token,
-            'user': user.to_dict()
+            'user': user.to_dict() # This now includes the 'interests' field
         }), 200
 
     except Exception as e:
@@ -153,9 +163,59 @@ def dashboard():
 
     return jsonify({
         'message': f"Welcome to your dashboard, {user.full_name}!",
-        'user': user.to_dict(), # Use the to_dict method from the User object
+        'user': user.to_dict(), # This now includes the 'interests' field
         'conferenceInfo': conference_info
     }), 200
+
+# --- NEW: Route to update user interests ---
+@api_bp.route('/users/<user_id>/interests', methods=['PUT'])
+@jwt_required() # Protect this route with JWT authentication
+def update_user_interests(user_id):
+    """
+    Updates the interests of a user.
+    """
+    if request.method == 'OPTIONS':
+        return '', 200
+
+    current_user_jwt_identity = get_jwt_identity()
+    current_user_id_from_jwt = current_user_jwt_identity.get('id')
+    current_user_role_from_jwt = current_user_jwt_identity.get('role')
+
+    # Authorization check: Ensure the authenticated user is updating their own profile
+    # or an admin is updating someone else's.
+    if str(current_user_id_from_jwt) != user_id and current_user_role_from_jwt != 'admin':
+        return jsonify({'message': 'Forbidden: You can only update your own interests.'}), 403
+
+    data = request.get_json()
+    interests = data.get('interests')
+
+    # Input validation
+    if not isinstance(interests, list):
+        return jsonify({'message': 'Invalid data: "interests" must be a list.'}), 400
+    if not all(isinstance(item, str) for item in interests):
+        return jsonify({'message': 'Invalid data: All items in "interests" must be strings.'}), 400
+
+    try:
+        user_to_update = User.find_by_id(user_id)
+        if not user_to_update:
+            return jsonify({'message': 'User not found.'}), 404
+
+        user_to_update.interests = interests # Update the interests field
+        # Use save() which updates the document if _id exists
+        user_to_update.save()
+
+        # Generate a new token with the updated interests
+        new_token = create_access_token(identity=user_to_update.to_dict())
+
+        return jsonify({
+            'success': True,
+            'message': 'Interests updated successfully!',
+            'user': user_to_update.to_dict(), # Return the updated user object
+            'token': new_token # Return the new token
+        }), 200
+    except Exception as e:
+        current_app.logger.error(f"Error updating user interests for {user_id}: {e}", exc_info=True)
+        return jsonify({'message': 'An error occurred while updating interests.', 'error': str(e)}), 500
 
 # --- OAuth Routes ---
 @api_bp.route('/auth/google', methods=['GET'])

@@ -282,7 +282,6 @@ def handle_oauth_callback(provider_name, remote_app):
             # Check if email is already registered via email/password or another OAuth provider
             existing_email_user = User.find_by_email(email)
             if existing_email_user:
-                # If email exists but with a different provider/method, block it
                 current_app.logger.warning(
                     f"Email '{email}' already registered with '{existing_email_user.provider}'."
                 )
@@ -296,6 +295,9 @@ def handle_oauth_callback(provider_name, remote_app):
                 email=email,
                 provider=provider_name,
                 provider_id=provider_id,
+                # --- ADD THIS LINE ---
+                interests=[]  # Initialize interests as an empty list for new OAuth users
+                # ---------------------
             )
             new_user.save()  # Inserts new document, sets new_user._id
             user = new_user  # Set user to the newly created user object
