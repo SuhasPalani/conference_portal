@@ -1,4 +1,3 @@
-# backend/config.py
 import os
 from dotenv import load_dotenv
 import datetime
@@ -33,3 +32,20 @@ class Config:
     JWT_ACCESS_TOKEN_EXPIRES = datetime.timedelta(hours=24)
     JWT_BLACKLIST_ENABLED = True
     JWT_BLACKLIST_TOKEN_CHECKS = ["access"]
+
+    # EmailJS Configuration (for sending emails via client-side integration, or server-side for sensitive ones)
+    EMAILJS_SERVICE_ID = os.environ.get("EMAILJS_SERVICE_ID")
+    EMAILJS_TEMPLATE_CONTACT_US_ID = os.environ.get("EMAILJS_TEMPLATE_CONTACT_US_ID")
+    EMAILJS_TEMPLATE_ROLE_ASSIGNED_ID = os.environ.get(
+        "EMAILJS_TEMPLATE_ROLE_ASSIGNED_ID"
+    )
+    EMAILJS_PUBLIC_KEY = os.environ.get(
+        "EMAILJS_PUBLIC_KEY"
+    )  # This is typically used client-side
+    EMAILJS_PRIVATE_KEY = os.environ.get(
+        "EMAILJS_PRIVATE_KEY"
+    )  # Use for server-side API calls if needed
+
+    ADMIN_EMAIL = os.environ.get(
+        "ADMIN_EMAIL", "admin@maiple.com"
+    )  # Default admin email for notifications

@@ -114,7 +114,7 @@ def linkedin_fetch_userinfo(token):
         # Get basic profile info
         profile_resp = requests.get(
             "https://api.linkedin.com/v2/people/~:(id,localizedFirstName,localizedLastName,profilePicture(displayImage~:playableStreams))",
-            headers=headers
+            headers=headers,
         )
         profile_resp.raise_for_status()
         profile_data = profile_resp.json()
@@ -147,7 +147,13 @@ def linkedin_fetch_userinfo(token):
                 elements = display_image["elements"]
                 if elements:
                     # Get the largest image
-                    largest_image = max(elements, key=lambda x: x.get("data", {}).get("com.linkedin.digitalmedia.mediaartifact.StillImage", {}).get("storageSize", {}).get("width", 0))
+                    largest_image = max(
+                        elements,
+                        key=lambda x: x.get("data", {})
+                        .get("com.linkedin.digitalmedia.mediaartifact.StillImage", {})
+                        .get("storageSize", {})
+                        .get("width", 0),
+                    )
                     identifiers = largest_image.get("identifiers", [])
                     if identifiers:
                         picture_url = identifiers[0].get("identifier")
@@ -170,29 +176,28 @@ def linkedin_fetch_userinfo(token):
         try:
             # Simplified fallback
             profile_resp = requests.get(
-                "https://api.linkedin.com/v2/people/~",
-                headers=headers
+                "https://api.linkedin.com/v2/people/~", headers=headers
             )
             profile_resp.raise_for_status()
             profile_data = profile_resp.json()
-            
+
             email_resp = requests.get(
                 "https://api.linkedin.com/v2/emailAddress?q=members&projection=(elements*(handle~))",
                 headers=headers,
             )
             email_resp.raise_for_status()
             email_data = email_resp.json()
-            
+
             email = None
             if email_data.get("elements") and len(email_data["elements"]) > 0:
                 email_element = email_data["elements"][0]
                 if "handle~" in email_element:
                     email = email_element["handle~"].get("emailAddress")
-            
+
             first_name = profile_data.get("localizedFirstName", "")
             last_name = profile_data.get("localizedLastName", "")
             full_name = f"{first_name} {last_name}".strip()
-            
+
             return {
                 "id": profile_data.get("id"),
                 "name": full_name,
@@ -200,7 +205,7 @@ def linkedin_fetch_userinfo(token):
                 "given_name": first_name,
                 "family_name": last_name,
             }
-            
+
         except Exception as fallback_error:
             current_app.logger.error(f"LinkedIn fallback also failed: {fallback_error}")
             raise
@@ -234,14 +239,14 @@ def handle_oauth_callback(provider_name, remote_app):
             email = user_info.get("email")
             full_name = user_info.get("name", email)
             provider_id = user_info.get("id")
-            
+
         elif provider_name == "microsoft":
             resp = remote_app.get("me", token=token)
             user_info = resp.json()
             email = user_info.get("mail") or user_info.get("userPrincipalName")
             full_name = user_info.get("displayName", email)
             provider_id = user_info.get("id")
-            
+
         elif provider_name == "linkedin":
             # Use the traditional LinkedIn API
             user_info = linkedin_fetch_userinfo(token)
@@ -295,9 +300,8 @@ def handle_oauth_callback(provider_name, remote_app):
                 email=email,
                 provider=provider_name,
                 provider_id=provider_id,
-                # --- ADD THIS LINE ---
-                interests=[]  # Initialize interests as an empty list for new OAuth users
-                # ---------------------
+                interests=[],  # Initialize interests as an empty list for new OAuth users
+                status="pending",  # Set initial status to 'pending' for new OAuth users
             )
             new_user.save()  # Inserts new document, sets new_user._id
             user = new_user  # Set user to the newly created user object
