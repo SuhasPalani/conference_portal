@@ -1,4 +1,3 @@
-// pages/login.js
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import AuthForm from "../components/AuthForm"; // Correct path to AuthForm
@@ -17,7 +16,6 @@ const LoginPage = () => {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("info");
 
-
   useEffect(() => {
     if (!loadingAuth && isLoggedIn) {
       router.push("/dashboard");
@@ -35,7 +33,7 @@ const LoginPage = () => {
       if (result.success) {
         // --- CRUCIAL CHANGE HERE ---
         contextLogin(result.token); // Pass ONLY the token to AuthContext's login function
-        // The AuthContext will now decode the token and set the full user object (including role and full_name)
+        // The AuthContext will now decode the token and set the full user object (including role, status, and full_name)
         // --- END CRUCIAL CHANGE ---
 
         setMessage("Logged in successfully! Redirecting...");

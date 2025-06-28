@@ -14,15 +14,17 @@ const Notification = ({
     let timer;
     if (message) {
       setIsVisible(true);
-      // Automatically hide the notification after 5 seconds
-      timer = setTimeout(() => {
-        setIsVisible(false);
-      }, 5000);
+      // Automatically hide the notification after 5 seconds, unless it's a loading state
+      if (!isLoading) {
+        timer = setTimeout(() => {
+          setIsVisible(false);
+        }, 5000);
+      }
     } else {
       setIsVisible(false); // Hide if message is empty
     }
     return () => clearTimeout(timer); // Clean up the timer
-  }, [message]); // Re-run effect when the message changes
+  }, [message, isLoading]); // Re-run effect when the message or isLoading changes
 
   // Only render if a message is present OR it's loading, AND it's set to be visible
   if (!message && !isLoading && !isVisible) return null;

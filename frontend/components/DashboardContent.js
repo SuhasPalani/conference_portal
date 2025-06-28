@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import InterestsForm from "./InterestsForm"; // Import the InterestsForm component
 import Link from "next/link"; // Import Link for navigation
+import Alert from "./Alert"; // Import Alert component
 
 const DashboardContent = ({ user, conferenceInfo }) => {
   // State to control whether the InterestsForm is visible
@@ -9,10 +10,7 @@ const DashboardContent = ({ user, conferenceInfo }) => {
 
   // Determine if the user has interests already set
   const hasInterests = user?.interests && user.interests.length > 0;
-
-  // REMOVED THE PROBLEMATIC useEffect
-  // The form should only show when explicitly requested by clicking the button
-  // NOT automatically when there are no interests
+  const isPendingUser = user?.status === "pending"; // Check user status
 
   return (
     <div className="relative z-10 w-full max-w-4xl bg-gray-900 bg-opacity-70 backdrop-filter backdrop-blur-lg p-8 rounded-2xl shadow-2xl border border-gray-800 animate-fade-in-up">
@@ -28,6 +26,17 @@ const DashboardContent = ({ user, conferenceInfo }) => {
         Here's your personalized overview for the mAIple AI Conference.
       </p>
 
+      {/* Role Pending Notification */}
+      {isPendingUser && (
+        <div className="mb-8">
+          <Alert
+            message="Your role is currently pending assignment. Once assigned, your dashboard will be updated with more features."
+            type="info"
+          />
+        </div>
+      )}
+
+      {/* User Profile Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
         <div className="bg-gray-800 bg-opacity-60 p-6 rounded-xl shadow-lg border border-gray-700">
           <h2 className="text-2xl font-semibold text-white mb-3">
@@ -45,8 +54,13 @@ const DashboardContent = ({ user, conferenceInfo }) => {
             <span className="font-medium text-purple-300">Role:</span>{" "}
             {user?.role || "N/A"}
           </p>
+          <p className="text-lg text-gray-300">
+            <span className="font-medium text-purple-300">Status:</span>{" "}
+            {user?.status || "N/A"}
+          </p>
         </div>
 
+        {/* Conference Status (Existing) */}
         <div className="bg-gray-800 bg-opacity-60 p-6 rounded-xl shadow-lg border border-gray-700">
           <h2 className="text-2xl font-semibold text-white mb-3">
             Conference Status
@@ -75,7 +89,7 @@ const DashboardContent = ({ user, conferenceInfo }) => {
             onInterestsUpdated={() => setShowInterestsForm(false)} // Callback to hide form on successful update
           />
         ) : (
-          // Render current interests and an "Edit" button if interests are set
+          // Render current interests and an "Edit" button if interests are set or user wants to add
           <>
             {hasInterests ? (
               <ul className="list-disc list-inside text-left text-gray-300 text-lg grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -98,6 +112,7 @@ const DashboardContent = ({ user, conferenceInfo }) => {
         )}
       </div>
 
+      {/* Conference Info (Existing) */}
       <div className="bg-gray-800 bg-opacity-60 p-6 rounded-xl shadow-lg border border-gray-700">
         <h2 className="text-3xl font-bold text-white mb-4 font-montserrat">
           About the Conference
@@ -136,11 +151,31 @@ const DashboardContent = ({ user, conferenceInfo }) => {
           {conferenceInfo.participationTimelines}
         </p>
 
-        <p className="text-gray-500 text-sm italic mt-8">
-          This dashboard provides read-only information for regular users. For
-          administrative functions or role changes, please contact the portal
-          administrator.
-        </p>
+        {/* Submit an Idea (Conditional for pending users) */}
+        <div className="mt-8 pt-4 border-t border-gray-700">
+          <h3 className="text-2xl font-semibold text-white mb-3">
+            Submit Your Ideas
+          </h3>
+          <p
+            className={`text-lg mb-4 ${
+              isPendingUser ? "text-gray-500 italic" : "text-gray-300"
+            }`}
+          >
+            {isPendingUser
+              ? "This feature will be available once your role is assigned by an admin."
+              : "Have a brilliant idea for a session or workshop? Submit it here!"}
+          </p>
+          <button
+            className={`inline-block font-semibold py-2 px-6 rounded-full transition duration-300 ${
+              isPendingUser
+                ? "bg-gray-600 text-gray-300 cursor-not-allowed"
+                : "bg-purple-600 hover:bg-purple-700 text-white transform hover:scale-105"
+            }`}
+            disabled={isPendingUser}
+          >
+            Submit an Idea
+          </button>
+        </div>
       </div>
     </div>
   );

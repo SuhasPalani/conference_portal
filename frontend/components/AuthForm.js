@@ -1,22 +1,22 @@
 // components/AuthForm.js
-import React, { useState } from 'react';
-import Link from 'next/link';
+import React, { useState } from "react";
+import Link from "next/link";
 
 const AuthForm = ({ type, onSubmit, isLoading, message, messageType }) => {
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [localMessage, setLocalMessage] = useState('');
-  const [localMessageType, setLocalMessageType] = useState('');
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [localMessage, setLocalMessage] = useState("");
+  const [localMessageType, setLocalMessageType] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    setLocalMessage(''); // Clear local message on new submission
+    setLocalMessage(""); // Clear local message on new submission
 
-    if (type === 'signup' && password !== confirmPassword) {
-      setLocalMessage('Passwords do not match.');
-      setLocalMessageType('error');
+    if (type === "signup" && password !== confirmPassword) {
+      setLocalMessage("Passwords do not match.");
+      setLocalMessageType("error");
       return;
     }
 
@@ -30,54 +30,68 @@ const AuthForm = ({ type, onSubmit, isLoading, message, messageType }) => {
       setLocalMessage(message);
       setLocalMessageType(messageType);
       // Clear message after some time if it's a success/error, but not loading
-      if (messageType !== 'info') {
+      if (messageType !== "info") {
         const timer = setTimeout(() => {
-          setLocalMessage('');
+          setLocalMessage("");
         }, 5000); // Message disappears after 5 seconds
         return () => clearTimeout(timer);
       }
     }
   }, [message, messageType]);
 
-  const isSignUp = type === 'signup';
-  const title = isSignUp ? 'Create Your Account' : 'Welcome Back';
-  const buttonText = isSignUp ? (isLoading ? 'Signing Up...' : 'Sign Up') : (isLoading ? 'Logging In...' : 'Login');
-  const switchText = isSignUp ? 'Already have an account?' : 'Need an account?';
-  const switchLinkText = isSignUp ? 'Login Here' : 'Sign Up Here';
-  const switchHref = isSignUp ? '/login' : '/signup';
+  const isSignUp = type === "signup";
+  const title = isSignUp ? "Create Your Account" : "Welcome Back";
+  const buttonText = isSignUp
+    ? isLoading
+      ? "Signing Up..."
+      : "Sign Up"
+    : isLoading
+    ? "Logging In..."
+    : "Login";
+  const switchText = isSignUp ? "Already have an account?" : "Need an account?";
+  const switchLinkText = isSignUp ? "Login Here" : "Sign Up Here";
+  const switchHref = isSignUp ? "/login" : "/signup";
 
   const getMessageClasses = (msgType) => {
     switch (msgType) {
-      case 'success':
-        return 'text-green-400 bg-green-900/20 border-green-500';
-      case 'error':
-        return 'text-red-400 bg-red-900/20 border-red-500';
-      case 'info':
-        return 'text-blue-400 bg-blue-900/20 border-blue-500';
+      case "success":
+        return "text-green-400 bg-green-900/20 border-green-500";
+      case "error":
+        return "text-red-400 bg-red-900/20 border-red-500";
+      case "info":
+        return "text-blue-400 bg-blue-900/20 border-blue-500";
       default:
-        return 'hidden'; // Hide if no message or unknown type
+        return "hidden"; // Hide if no message or unknown type
     }
   };
 
   return (
-    <div className="w-full max-w-md mx-auto text-center relative z-20"> {/* Ensure content is above background shapes */}
+    <div className="w-full max-w-md mx-auto text-center relative z-20">
+      {" "}
+      {/* Ensure content is above background shapes */}
       <h2 className="text-4xl font-bold text-white mb-6 font-montserrat drop-shadow-md animate-fade-in-down">
         {title}
       </h2>
       <p className="text-lg text-gray-300 mb-8 animate-fade-in delay-100">
-        {isSignUp ? "Join mAIple today and unlock exclusive access to AI conference content." : "Access your conference portal."}
+        {isSignUp
+          ? "Join mAIple today and unlock exclusive access to AI conference content."
+          : "Access your conference portal."}
       </p>
-
       {(localMessage || isLoading) && (
-        <div className={`p-4 mb-6 rounded-lg border text-sm ${getMessageClasses(localMessageType)} animate-fade-in`}>
+        <div
+          className={`p-4 mb-6 rounded-lg border text-sm ${getMessageClasses(
+            localMessageType
+          )} animate-fade-in`}
+        >
           {localMessage}
         </div>
       )}
-
       <form onSubmit={handleSubmit} className="space-y-6">
         {isSignUp && (
           <div>
-            <label htmlFor="fullName" className="sr-only">Full Name</label>
+            <label htmlFor="fullName" className="sr-only">
+              Full Name
+            </label>
             <input
               id="fullName"
               name="fullName"
@@ -92,7 +106,9 @@ const AuthForm = ({ type, onSubmit, isLoading, message, messageType }) => {
           </div>
         )}
         <div>
-          <label htmlFor="email" className="sr-only">Email address</label>
+          <label htmlFor="email" className="sr-only">
+            Email address
+          </label>
           <input
             id="email"
             name="email"
@@ -107,7 +123,9 @@ const AuthForm = ({ type, onSubmit, isLoading, message, messageType }) => {
           />
         </div>
         <div>
-          <label htmlFor="password" className="sr-only">Password</label>
+          <label htmlFor="password" className="sr-only">
+            Password
+          </label>
           <input
             id="password"
             name="password"
@@ -123,7 +141,9 @@ const AuthForm = ({ type, onSubmit, isLoading, message, messageType }) => {
         </div>
         {isSignUp && (
           <div>
-            <label htmlFor="confirmPassword" className="sr-only">Confirm Password</label>
+            <label htmlFor="confirmPassword" className="sr-only">
+              Confirm Password
+            </label>
             <input
               id="confirmPassword"
               name="confirmPassword"
@@ -149,11 +169,13 @@ const AuthForm = ({ type, onSubmit, isLoading, message, messageType }) => {
           </button>
         </div>
       </form>
-
       <div className="mt-8 text-center text-lg">
         <p className="text-gray-400">
-          {switchText}{' '}
-          <Link href={switchHref} className="font-semibold text-purple-400 hover:text-purple-300 hover:underline transition duration-200">
+          {switchText}{" "}
+          <Link
+            href={switchHref}
+            className="font-semibold text-purple-400 hover:text-purple-300 hover:underline transition duration-200"
+          >
             {switchLinkText}
           </Link>
         </p>

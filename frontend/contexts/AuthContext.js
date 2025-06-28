@@ -38,24 +38,26 @@ export const AuthProvider = ({ children }) => {
   const setAuthUserFromToken = useCallback(
     (token) => {
       const decoded = decodeToken(token);
-      console.log("🐛 DEBUG: Full decoded token:", decoded); // This line is already there, make sure it's active!
+      console.log("🐛 DEBUG: Full decoded token:", decoded);
 
       if (decoded) {
+        // Construct the user object from the decoded token payload (sub contains the identity dict)
         const userObj = {
-          id: decoded.id || decoded.sub?.id,
+          id: decoded.sub?.id || decoded.id, // Prefer sub.id, fallback to id
           fullName:
-            decoded.full_name || decoded.sub?.full_name || decoded.fullName,
-          email: decoded.email || decoded.sub?.email,
-          provider: decoded.provider || decoded.sub?.provider,
-          role: decoded.role || decoded.sub?.role, // <--- This is the key line
-          interests: decoded.interests || [],
+            decoded.sub?.full_name || decoded.full_name || decoded.fullName,
+          email: decoded.sub?.email || decoded.email,
+          provider: decoded.sub?.provider || decoded.provider,
+          role: decoded.sub?.role || decoded.role,
+          interests: decoded.sub?.interests || decoded.interests || [],
+          status: decoded.sub?.status || decoded.status || "pending", // Ensure status is pulled from token
         };
 
-        console.log("🐛 DEBUG: Final userObj being set:", userObj); // <-- ADD/ENSURE THIS LINE
+        console.log("🐛 DEBUG: Final userObj being set:", userObj);
 
-        setUserData(userObj);
-        setUser({ ...userObj, token });
-        setAuthToken(token);
+        setUserData(userObj); // Save the full user object to local storage
+        setUser({ ...userObj, token }); // Set user in state, including the token
+        setAuthToken(token); // Save the token itself to local storage
         return true;
       } else {
         console.error("Decoded token invalid.");
@@ -70,7 +72,6 @@ export const AuthProvider = ({ children }) => {
   // This now accepts only the token, as all user data is derived from it.
   const login = useCallback(
     (token) => {
-      // <--- CHANGE IS HERE: ONLY 'token' parameter
       setLoadingAuth(true); // Indicate loading while processing login
       const success = setAuthUserFromToken(token); // Use the centralized function
       if (success) {
@@ -96,11 +97,15 @@ export const AuthProvider = ({ children }) => {
   }, [apiLogoutUser, clearAuthAndState, router]); // Dependencies for useCallback
 
   // New function to update the user object in context directly
-  // Useful when a user's data (like interests) changes without a full re-login
+  // Useful when a user's data (like interests, role, status) changes without a full re-login
   const updateUserContext = useCallback((newUserData) => {
     setUser((prevUser) => {
       const updatedUser = { ...prevUser, ...newUserData };
-      setUserData(updatedUser); // Also update user data in local storage
+      setUserData(updatedUser); // Update user data in local storage
+      // If a new token is part of newUserData, update it in local storage
+      if (newUserData.token && newUserData.token !== prevUser?.token) {
+        setAuthToken(newUserData.token);
+      }
       return updatedUser;
     });
   }, []);
@@ -135,25 +140,21 @@ export const AuthProvider = ({ children }) => {
   // Effect to handle OAuth redirects: extracts token from URL and logs in
   useEffect(() => {
     const handleOAuthRedirect = () => {
-      // Extract only the token and error from the URL query parameters
-      // fullName, email, provider are no longer needed here as they come from the token payload
       const { token, error } = router.query;
 
       if (error) {
         console.error("OAuth Error:", error);
-        // Clean up the URL to remove the error parameter
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete("error");
         router.replace(cleanUrl.pathname, undefined, { shallow: true });
-        return; // Stop execution if there's an error
+        return;
       }
 
       if (token) {
         console.log("Processing OAuth redirect with token...");
-        login(token); // <--- CHANGE IS HERE: Pass ONLY the token to the context login function
+        login(token); // Pass ONLY the token to the context login function
 
         // Clean up the URL by removing all OAuth-related query parameters
-        // These are legacy params from the backend redirect; we no longer use them for state
         const cleanUrl = new URL(window.location.href);
         cleanUrl.searchParams.delete("token");
         cleanUrl.searchParams.delete("fullName");
@@ -162,7 +163,6 @@ export const AuthProvider = ({ children }) => {
         router.replace(cleanUrl.pathname, undefined, { shallow: true }); // Use replace to avoid browser history issues
 
         // Redirect to dashboard after successful OAuth login
-        // A small delay can help ensure state updates are fully processed before redirect
         setTimeout(() => {
           router.push("/dashboard");
         }, 100);
@@ -185,7 +185,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         loadingAuth,
         updateUserContext,
-      }} // <--- ADDED updateUserContext
+      }} // ADDED updateUserContext
     >
       {children}
     </AuthContext.Provider>

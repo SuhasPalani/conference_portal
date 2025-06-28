@@ -58,11 +58,12 @@ const InterestsForm = ({ onInterestsUpdated }) => {
       return;
     }
 
-    if (selectedInterests.length === 0) {
-      setNotificationMessage("Please select at least one interest.");
-      setNotificationMessageType("error");
-      return;
-    }
+    // Allow saving empty interests as that is a valid state if user wants to clear them
+    // if (selectedInterests.length === 0) {
+    //   setNotificationMessage("Please select at least one interest.");
+    //   setNotificationMessageType("error");
+    //   return;
+    // }
 
     setNotificationLoading(true);
     setNotificationMessage("Updating interests...");
@@ -73,8 +74,8 @@ const InterestsForm = ({ onInterestsUpdated }) => {
     if (result.success) {
       setNotificationMessage(result.message);
       setNotificationMessageType("success");
-      // Update the user context immediately after successful update
-      updateUserContext({ interests: selectedInterests });
+      // Update the user context immediately after successful update with the new user object from backend
+      updateUserContext(result.user); // Backend now returns the updated user object
       if (onInterestsUpdated) {
         onInterestsUpdated(); // Call callback to notify parent of update
       }
@@ -124,6 +125,16 @@ const InterestsForm = ({ onInterestsUpdated }) => {
           >
             {notificationLoading ? "Saving..." : "Save Interests"}
           </button>
+          {onInterestsUpdated && ( // Add a cancel button if a callback exists
+            <button
+              type="button"
+              onClick={() => onInterestsUpdated()}
+              disabled={notificationLoading}
+              className="ml-4 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-3 px-8 rounded-full transition duration-300 ease-in-out transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </form>
 

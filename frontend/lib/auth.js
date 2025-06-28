@@ -1,8 +1,7 @@
-// frontend/lib/auth.js
 import { jwtDecode } from "jwt-decode"; // Correct import for jwt-decode library
+import emailjs from "@emailjs/browser"; // Import EmailJS for frontend use
 
 // Backend API URL from environment variables
-// Ensure NEXT_PUBLIC_API_BASE_URL is defined in your .env.local file (e.g., NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/api)
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const TOKEN_KEY = "token"; // Consistent key for localStorage
 const USER_DATA_KEY = "user_data"; // Key for storing user object
@@ -49,7 +48,10 @@ export const decodeToken = (token) => {
 
   try {
     const decoded = jwtDecode(token);
-    console.log("Decoded JWT payload:", decoded); // <-- ADD THIS LINE FOR DEBUGGING
+    // The actual user identity is usually under the 'sub' claim in Flask-JWT-Extended
+    // The 'sub' field itself contains the dictionary we passed (e.g., {'id': ..., 'full_name': ...})
+    const identity = decoded.sub || decoded; // Use 'sub' if present, otherwise the whole decoded object
+
     const currentTime = Date.now() / 1000;
 
     if (decoded.exp < currentTime) {
@@ -58,7 +60,7 @@ export const decodeToken = (token) => {
       removeUserData();
       return null;
     }
-    return decoded;
+    return identity; // Return the identity object which holds user data
   } catch (error) {
     console.error("Failed to decode token:", error);
     removeAuthToken();
@@ -133,7 +135,7 @@ export const loginUser = async (email, password) => {
       body: JSON.stringify({ email, password }),
     });
     const data = await response.json();
-    // The 'user' object in data should now contain 'interests' if backend sends it.
+    // The 'user' object in data should now contain 'interests' and 'status'.
     if (response.ok && data.token && data.user) {
       return {
         success: true,
@@ -172,7 +174,7 @@ export const signupUser = async (fullName, email, password) => {
       body: JSON.stringify({ fullName, email, password }), // `fullName` matches backend expectation
     });
     const data = await response.json();
-    // The 'user' object in data should now contain 'interests' (likely empty array initially).
+    // The 'user' object in data should now contain 'interests' (likely empty array initially) and 'status' ('pending').
     if (response.ok && data.token && data.user) {
       return {
         success: true,
@@ -267,26 +269,49 @@ export const callApi = async (endpoint, method = "GET", body = null) => {
 
   try {
     const response = await fetch(`${BACKEND_URL}${endpoint}`, config);
-    const data = await response.json();
 
-    if (!response.ok) {
-      if (response.status === 401) {
-        console.warn(
-          `API call to ${endpoint} received 401 Unauthorized. Token might be expired.`
-        );
-        // In a real application, you might want to trigger a logout here
-        // or a token refresh if you have a refresh token mechanism.
+    // --- NEW DEBUGGING PRINTS (Keep these for now) ---
+    console.log(
+      `DEBUG FE: API Response Status for ${endpoint}: ${response.status}`
+    );
+    console.log(`DEBUG FE: API Response Headers for ${endpoint}:`, [
+      ...response.headers.entries(),
+    ]);
+    const responseText = await response.text(); // Read as text first
+    console.log(
+      `DEBUG FE: API Response Raw Text for ${endpoint}:`,
+      responseText
+    );
+
+    try {
+      const data = JSON.parse(responseText); // Try parsing text as JSON
+      console.log(`DEBUG FE: API Response Parsed JSON for ${endpoint}:`, data);
+      // --- END NEW DEBUGGING PRINTS ---
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.warn(
+            `API call to ${endpoint} received 401 Unauthorized. Token might be expired.`
+          );
+        }
+        return {
+          success: false,
+          status: response.status,
+          message: data.message || `API error: ${response.status}`,
+        };
       }
-      return {
-        success: false,
-        status: response.status,
-        message: data.message || `API error: ${response.status}`,
-      };
-    }
 
-    return { success: true, data };
-  } catch (error) {
-    console.error(`Network error calling ${endpoint}:`, error);
+      return { success: true, data };
+    } catch (jsonError) {
+      console.error(`DEBUG FE: JSON parsing error for ${endpoint}:`, jsonError);
+      console.error(
+        `DEBUG FE: Raw response text that caused JSON error:`,
+        responseText
+      );
+      return { success: false, message: "Server response was not valid JSON." };
+    }
+  } catch (networkError) {
+    console.error(`DEBUG FE: Network error calling ${endpoint}:`, networkError);
     return { success: false, message: "Network error or server unavailable." };
   }
 };
@@ -318,11 +343,18 @@ export const updateUserInterests = async (userId, interests) => {
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.message || "Failed to update interests.");
+      // Backend now returns error details if any
+      return {
+        success: false,
+        message: data.message || "Failed to update interests.",
+        status: response.status,
+      };
     }
     return {
       success: true,
       message: data.message || "Interests updated successfully.",
+      user: data.user, // The backend now returns the updated user object
+      token: data.token, // Ensure the new token is also returned
     };
   } catch (error) {
     console.error("Error updating interests:", error);
@@ -331,4 +363,201 @@ export const updateUserInterests = async (userId, interests) => {
       message: error.message || "An unexpected error occurred.",
     };
   }
+};
+
+/**
+ * Fetches all users from the backend (admin only).
+ * @returns {Promise<object>} Object with `success` boolean and `users` array (if successful).
+ */
+export const fetchAllUsers = async () => {
+  const result = await callApi("/admin/users", "GET");
+  if (result.success) {
+    return { success: true, users: result.data.users };
+  } else {
+    return {
+      success: false,
+      message: result.message || "Failed to fetch users.",
+    };
+  }
+};
+
+/**
+ * Updates a user's role and status on the backend (admin only).
+ * @param {string} userId - The ID of the user to update.
+ * @param {string} role - The new role (e.g., 'Regular User', 'Mentor', 'Admin').
+ * @param {string} status - The new status (e.g., 'pending', 'active', 'inactive').
+ * @returns {Promise<object>} Object with `success` boolean, `user` (if successful), or `message`.
+ */
+export const updateUserRoleStatus = async (userId, role, status) => {
+  const token = getAuthToken();
+  if (!token) {
+    return { success: false, message: "Authentication token missing." };
+  }
+
+  try {
+    const response = await fetch(
+      `${BACKEND_URL}/admin/users/${userId}/status`,
+      {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ role, status }),
+      }
+    );
+
+    const data = await response.json();
+    if (!response.ok) {
+      return {
+        success: false,
+        message: data.message || "Failed to update user role/status.",
+        status: response.status,
+      };
+    }
+    return {
+      success: true,
+      message: data.message || "User role and status updated successfully.",
+      user: data.user, // Backend returns the updated user object
+      token: data.token, // Return the new token here
+    };
+  } catch (error) {
+    console.error("Error updating user role/status:", error);
+    return {
+      success: false,
+      message: error.message || "An unexpected error occurred.",
+    };
+  }
+};
+
+/**
+ * Submits the contact form data to the backend.
+ * @param {object} formData - Object containing name, email, subject, message.
+ * @returns {Promise<object>} Object with `success` boolean or `message`.
+ */
+export const submitContactForm = async (formData) => {
+  try {
+    const response = await fetch(`${BACKEND_URL}/contact`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(formData),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      return {
+        success: false,
+        message: data.message || "Failed to send message.",
+      };
+    }
+    return {
+      success: true,
+      message: data.message || "Message sent successfully!",
+    };
+  } catch (error) {
+    console.error("Error submitting contact form:", error);
+    return { success: false, message: "Network error or server unavailable." };
+  }
+};
+
+// --- NEW API CALLS FOR MENTORS AND TEAMS ---
+
+/**
+ * Fetches mentors from the backend with optional search and skill filters.
+ * @param {string} searchTerm
+ * @param {string} skill
+ * @returns {Promise<object>} Object with `success` boolean and `mentors` array.
+ */
+export const fetchMentors = async (searchTerm = "", skill = "") => {
+  const queryParams = new URLSearchParams();
+  if (searchTerm) queryParams.append("search", searchTerm);
+  if (skill) queryParams.append("skill", skill);
+
+  const endpoint = `/mentors?${queryParams.toString()}`;
+  const result = await callApi(endpoint, "GET");
+
+  if (result.success) {
+    return { success: true, mentors: result.data.mentors };
+  } else {
+    return {
+      success: false,
+      message: result.message || "Failed to fetch mentors.",
+    };
+  }
+};
+
+/**
+ * Sends a connection request to a mentor.
+ * @param {string} mentorId
+ * @returns {Promise<object>} Object with `success` boolean and `message`.
+ */
+export const connectWithMentor = async (mentorId) => {
+  const result = await callApi(`/mentors/${mentorId}/connect`, "POST");
+  return result; // result already contains success/message
+};
+
+/**
+ * Fetches teams from the backend with optional search and category filters.
+ * @param {string} searchTerm
+ * @param {string} category
+ * @returns {Promise<object>} Object with `success` boolean and `teams` array.
+ */
+export const fetchTeams = async (searchTerm = "", category = "") => {
+  const queryParams = new URLSearchParams();
+  if (searchTerm) queryParams.append("search", searchTerm);
+  if (category) queryParams.append("category", category);
+
+  const endpoint = `/teams?${queryParams.toString()}`;
+  const result = await callApi(endpoint, "GET");
+
+  if (result.success) {
+    return { success: true, teams: result.data.teams };
+  } else {
+    return {
+      success: false,
+      message: result.message || "Failed to fetch teams.",
+    };
+  }
+};
+
+/**
+ * Creates a new team on the backend.
+ * @param {object} teamData - Team details (name, description, category, maxMembers, skillsNeeded).
+ * @returns {Promise<object>} Object with `success` boolean, `team` object, `user` object, and `token`.
+ */
+export const createTeam = async (teamData) => {
+  const result = await callApi("/teams", "POST", teamData);
+  return result; // result will contain success, message, team, user, and token
+};
+
+/**
+ * Sends a request to join a team.
+ * @param {string} teamId
+ * @returns {Promise<object>} Object with `success` boolean, `message`, `user` object, and `token`.
+ */
+export const joinTeam = async (teamId) => {
+  const result = await callApi(`/teams/${teamId}/join`, "POST");
+  return result; // result will contain success, message, user, and token
+};
+
+/**
+ * Sends a request to leave a team.
+ * @param {string} teamId
+ * @returns {Promise<object>} Object with `success` boolean, `message`, `user` object, and `token`.
+ */
+export const leaveTeam = async (teamId) => {
+  const result = await callApi(`/teams/${teamId}/leave`, "POST");
+  return result; // result will contain success, message, user, and token
+};
+
+/**
+ * Sends a request to disband a team (only for team leader).
+ * @param {string} teamId
+ * @returns {Promise<object>} Object with `success` boolean, `message`, `user` object, and `token`.
+ */
+export const disbandTeam = async (teamId) => {
+  const result = await callApi(`/teams/${teamId}/disband`, "DELETE");
+  return result; // result will contain success, message, user, and token
 };

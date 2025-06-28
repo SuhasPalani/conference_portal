@@ -7,6 +7,7 @@ import DashboardLayout from "../components/Layout/DashboardLayout";
 import DashboardContent from "../components/DashboardContent";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
+import Alert from "../components/Alert"; // Import Alert for specific messages
 
 const DashboardPage = () => {
   const router = useRouter();
@@ -48,6 +49,8 @@ const DashboardPage = () => {
 
         if (response.success) {
           setConferenceInfo(response.data.conferenceInfo); // Access data from response.data
+          // The user object in AuthContext is already updated via setAuthUserFromToken
+          // so no need to setUser here from response.data.user
         } else {
           // If API call was not successful
           setError(response.message || "Failed to fetch dashboard data.");

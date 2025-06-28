@@ -137,6 +137,14 @@ const HomePage = () => {
                     >
                       Dashboard
                     </Link>
+                    {user.role === "admin" && ( // Conditional link for Admin
+                      <Link
+                        href="/admin"
+                        className="block px-4 py-2 text-sm text-purple-200 hover:bg-gray-700 hover:text-purple-100 transition duration-200"
+                      >
+                        Admin Panel
+                      </Link>
+                    )}
                     <button
                       onClick={handleLogout}
                       className="block w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-gray-700 hover:text-red-300 transition duration-200"
