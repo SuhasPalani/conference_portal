@@ -2,14 +2,14 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { useAuth } from "../contexts/AuthContext";
-import { callApi } from "../lib/auth";
+import { callApi } from "../lib/auth"; // Assuming callApi handles token inclusion
 import DashboardLayout from "../components/Layout/DashboardLayout";
 import LoadingSpinner from "../components/LoadingSpinner";
 import ErrorMessage from "../components/ErrorMessage";
 
 const FindTeamsPage = () => {
   const router = useRouter();
-  const { user, isLoggedIn, loadingAuth, logout } = useAuth();
+  const { user, isLoggedIn, loadingAuth, logout, setUser } = useAuth(); // Destructure setUser if available
 
   const [teams, setTeams] = useState([]);
   const [loadingData, setLoadingData] = useState(true);
@@ -24,80 +24,6 @@ const FindTeamsPage = () => {
     skillsNeeded: [],
     maxMembers: 5,
   });
-
-  // Dummy data for placeholder
-  const dummyTeams = [
-    {
-      id: 1,
-      name: "HealthAI Innovators",
-      description:
-        "Building an AI-powered diagnostic tool for early disease detection using medical imaging.",
-      category: "Healthcare",
-      leader: "Alice Johnson",
-      currentMembers: 3,
-      maxMembers: 5,
-      skillsNeeded: ["Computer Vision", "Medical AI", "Python", "TensorFlow"],
-      status: "Looking for members",
-      created: "2 days ago",
-    },
-    {
-      id: 2,
-      name: "EcoPredict",
-      description:
-        "Developing machine learning models to predict environmental changes and climate patterns.",
-      category: "Environment",
-      leader: "David Park",
-      currentMembers: 2,
-      maxMembers: 4,
-      skillsNeeded: ["Time Series Analysis", "Python", "R", "Data Science"],
-      status: "Looking for members",
-      created: "1 day ago",
-    },
-    {
-      id: 3,
-      name: "FinanceBot Pro",
-      description:
-        "Creating an intelligent chatbot for personal finance management and investment advice.",
-      category: "Finance",
-      leader: "Maria Garcia",
-      currentMembers: 4,
-      maxMembers: 6,
-      skillsNeeded: ["NLP", "React", "Node.js", "Financial Modeling"],
-      status: "Almost full",
-      created: "3 days ago",
-    },
-    {
-      id: 4,
-      name: "EduAI Assistant",
-      description:
-        "Building an AI tutor that adapts to individual learning styles and provides personalized education.",
-      category: "Education",
-      leader: "Robert Chen",
-      currentMembers: 1,
-      maxMembers: 4,
-      skillsNeeded: [
-        "NLP",
-        "Machine Learning",
-        "UI/UX",
-        "Educational Psychology",
-      ],
-      status: "Looking for members",
-      created: "4 hours ago",
-    },
-    {
-      id: 5,
-      name: "Smart City Analytics",
-      description:
-        "Analyzing urban data to optimize traffic flow, energy consumption, and public services.",
-      category: "Smart Cities",
-      leader: "Jessica Liu",
-      currentMembers: 5,
-      maxMembers: 5,
-      skillsNeeded: [],
-      status: "Team full",
-      created: "1 week ago",
-    },
-  ];
 
   const categories = [
     "Healthcare",
@@ -124,6 +50,56 @@ const FindTeamsPage = () => {
     "Cloud Computing",
   ];
 
+  // Helper function to fetch teams (called from useEffect and after team creation/joining)
+  // Update the fetchTeams function in your find-teams.js file
+  const fetchTeams = async () => {
+    setLoadingData(true);
+    setError("");
+
+    try {
+      if (!user) {
+        console.error("User missing in AuthContext during fetchTeams.");
+        logout(); // Or handle redirection more gracefully
+        router.replace("/");
+        return;
+      }
+
+      // Construct query parameters
+      const queryParams = new URLSearchParams();
+      if (searchTerm) {
+        queryParams.append("search", searchTerm);
+      }
+      if (selectedCategory) {
+        queryParams.append("category", selectedCategory);
+      }
+
+      const queryString = queryParams.toString();
+      const url = queryString ? `/teams?${queryString}` : "/teams";
+
+      const response = await callApi(url, "GET");
+
+      if (response.success) {
+        // Fix: Access the nested data property
+        const teamsData = response.data?.data || response.data;
+
+        if (Array.isArray(teamsData)) {
+          setTeams(teamsData);
+        } else {
+          console.warn("API returned non-array data for teams:", response.data);
+          setTeams([]); // Ensure it's always an array
+          setError("Received unexpected data format from the server.");
+        }
+      } else {
+        setError(response.message || "Failed to fetch teams.");
+      }
+    } catch (err) {
+      console.error("Error fetching teams:", err);
+      setError("Network error or server unavailable.");
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
   useEffect(() => {
     if (loadingAuth) return;
 
@@ -133,68 +109,102 @@ const FindTeamsPage = () => {
       return;
     }
 
-    const fetchTeams = async () => {
-      setLoadingData(true);
-      setError("");
-
-      try {
-        if (!user) {
-          console.error("User missing in AuthContext, initiating logout.");
-          logout();
-          router.replace("/");
-          return;
-        }
-
-        // In a real application, you would call your API here
-        // const response = await callApi("/teams", "GET");
-
-        // For now, using dummy data
-        setTimeout(() => {
-          setTeams(dummyTeams);
-          setLoadingData(false);
-        }, 1000);
-      } catch (err) {
-        console.error("Error fetching teams:", err);
-        setError("Network error or server unavailable.");
-        setLoadingData(false);
-      }
-    };
-
+    // Call fetchTeams when isLoggedIn, searchTerm, or selectedCategory changes
     fetchTeams();
-  }, [isLoggedIn, loadingAuth, router, user, logout]);
-
+  }, [
+    isLoggedIn,
+    loadingAuth,
+    router,
+    user,
+    logout,
+    searchTerm,
+    selectedCategory,
+  ]);
+  const debugButtonState = (team) => {
+    console.log("🔍 DEBUG: Button state for team", team.name);
+    console.log("🔍 DEBUG: user.team_id:", user?.team_id);
+    console.log("🔍 DEBUG: team.id:", team.id);
+    console.log("🔍 DEBUG: team.status:", team.status);
+    console.log("🔍 DEBUG: team.currentMembers:", team.currentMembers);
+    console.log("🔍 DEBUG: team.maxMembers:", team.maxMembers);
+  };
   const handleJoinTeam = async (teamId) => {
-    try {
-      // In a real application, you would call your API here
-      // const response = await callApi(`/teams/${teamId}/join`, "POST");
+    console.log("🔍 DEBUG: handleJoinTeam called with teamId:", teamId);
+    console.log("🔍 DEBUG: Current user:", user);
 
-      // For now, just show an alert
-      alert(`Connection request sent to team ${teamId}!`);
+    setError("");
+    try {
+      console.log("🔍 DEBUG: About to call API for joining team");
+      const response = await callApi(`/teams/${teamId}/join`, "POST");
+
+      console.log("🔍 DEBUG: API response:", response);
+
+      if (response.success) {
+        alert(response.message || "Connection request sent!");
+        console.log("🔍 DEBUG: About to refresh teams");
+        fetchTeams(); // Refresh the list of teams
+
+        if (response.user && response.token && setUser) {
+          console.log("🔍 DEBUG: Updating user context");
+          setUser(response.user);
+        }
+      } else {
+        console.log("🔍 DEBUG: API returned error:", response.message);
+        setError(response.message || "Failed to send join request.");
+      }
     } catch (err) {
-      console.error("Error joining team:", err);
-      setError("Failed to send join request.");
+      console.error("🔍 DEBUG: Error in handleJoinTeam:", err);
+      setError("Failed to send join request due to network error.");
     }
   };
 
   const handleCreateTeam = async (e) => {
+    console.log("🔍 DEBUG: handleCreateTeam called");
     e.preventDefault();
-    try {
-      // In a real application, you would call your API here
-      // const response = await callApi("/teams", "POST", newTeam);
 
-      // For now, just show an alert and close modal
-      alert("Team created successfully!");
-      setShowCreateModal(false);
-      setNewTeam({
-        name: "",
-        description: "",
-        category: "",
-        skillsNeeded: [],
-        maxMembers: 5,
-      });
+    console.log("🔍 DEBUG: New team data:", newTeam);
+
+    setError("");
+    try {
+      const teamToCreate = {
+        ...newTeam,
+      };
+
+      console.log(
+        "🔍 DEBUG: About to send team creation request:",
+        teamToCreate
+      );
+      const response = await callApi("/teams", "POST", teamToCreate);
+
+      console.log("🔍 DEBUG: Create team API response:", response);
+
+      if (response.success) {
+        alert(response.message || "Team created successfully!");
+        setShowCreateModal(false);
+        setNewTeam({
+          name: "",
+          description: "",
+          category: "",
+          skillsNeeded: [],
+          maxMembers: 5,
+        });
+        console.log("🔍 DEBUG: About to refresh teams after creation");
+        fetchTeams();
+
+        if (response.user && response.token && setUser) {
+          console.log("🔍 DEBUG: Updating user context after team creation");
+          setUser(response.user);
+        }
+      } else {
+        console.log(
+          "🔍 DEBUG: Create team API returned error:",
+          response.message
+        );
+        setError(response.message || "Failed to create team.");
+      }
     } catch (err) {
-      console.error("Error creating team:", err);
-      setError("Failed to create team.");
+      console.error("🔍 DEBUG: Error in handleCreateTeam:", err);
+      setError("Failed to create team due to network error.");
     }
   };
 
@@ -208,10 +218,12 @@ const FindTeamsPage = () => {
   };
 
   const filteredTeams = teams.filter((team) => {
+    const leaderName = team.leader?.full_name || ""; // Ensure leader is not null
+
     const matchesSearch =
       team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       team.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      team.leader.toLowerCase().includes(searchTerm.toLowerCase());
+      leaderName.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesCategory =
       selectedCategory === "" || team.category === selectedCategory;
@@ -224,15 +236,20 @@ const FindTeamsPage = () => {
   }
 
   if (!isLoggedIn) {
-    return null;
+    return null; // Don't render anything if not logged in and redirecting
   }
 
   if (loadingData) {
     return <LoadingSpinner message="Loading teams..." />;
   }
 
+  // Display error message if there is one
   if (error) {
-    return <ErrorMessage message={error} />;
+    return (
+      <DashboardLayout title="Find Teams - mAIple Conference Portal">
+        <ErrorMessage message={error} />
+      </DashboardLayout>
+    );
   }
 
   return (
@@ -241,8 +258,6 @@ const FindTeamsPage = () => {
       description="Join or create teams for hackathons and collaborative projects."
     >
       <div className="max-w-6xl mx-auto p-6 text-white">
-        {" "}
-        {/* Added text-white here for general text */}
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-white mb-2">Find Teams</h1>
@@ -334,27 +349,30 @@ const FindTeamsPage = () => {
                   <span>
                     Team Leader:{" "}
                     <span className="font-medium text-white">
-                      {team.leader}
+                      {team.leader?.full_name || "N/A"}
                     </span>
                   </span>
-                  <span>Created: {team.created}</span>
+                  {/* Assuming team.created is a string like "YYYY-MM-DD" */}
+                  <span>Created: {team.created || "N/A"}</span>
                 </div>
                 <div className="text-sm text-gray-400">
-                  Members: {team.currentMembers}/{team.maxMembers}
+                  Members: {team.currentMembers || 0}/
+                  {team.maxMembers || newTeam.maxMembers}
                 </div>
                 <div className="w-full bg-gray-700 rounded-full h-2 mt-1">
                   <div
                     className="bg-purple-600 h-2 rounded-full"
                     style={{
                       width: `${
-                        (team.currentMembers / team.maxMembers) * 100
+                        ((team.currentMembers || 0) / (team.maxMembers || 1)) *
+                        100
                       }%`,
                     }}
                   ></div>
                 </div>
               </div>
 
-              {team.skillsNeeded.length > 0 && (
+              {team.skillsNeeded?.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-medium text-white mb-2">
                     Skills Needed:
@@ -372,17 +390,45 @@ const FindTeamsPage = () => {
                 </div>
               )}
 
-              <button
-                onClick={() => handleJoinTeam(team.id)}
-                className={`w-full py-2 rounded-md text-sm font-medium transition-colors ${
-                  team.status === "Team full"
-                    ? "bg-gray-600 text-gray-300 cursor-not-allowed"
-                    : "bg-purple-600 text-white hover:bg-purple-700"
-                }`}
-                disabled={team.status === "Team full"}
-              >
-                {team.status === "Team full" ? "Team Full" : "Request to Join"}
-              </button>
+              {/* Conditional rendering for Join/Your Team/Already in a Team */}
+              {user?.team_id ? ( // Check if the current user is already in ANY team
+                user.team_id === team.id ? ( // Check if the current team IS the user's team
+                  <button
+                    className="w-full py-2 rounded-md text-sm font-medium bg-purple-800 text-white cursor-default"
+                    disabled
+                  >
+                    Your Team
+                  </button>
+                ) : (
+                  // User is in a different team
+                  <button
+                    className="w-full py-2 rounded-md text-sm font-medium bg-gray-600 text-gray-300 cursor-not-allowed"
+                    disabled
+                  >
+                    Already in a Team
+                  </button>
+                )
+              ) : (
+                // User is not in any team, allow joining
+                <button
+                  onClick={() => handleJoinTeam(team.id)}
+                  className={`w-full py-2 rounded-md text-sm font-medium transition-colors ${
+                    team.status === "Team full" ||
+                    team.currentMembers >= team.maxMembers
+                      ? "bg-gray-600 text-gray-300 cursor-not-allowed"
+                      : "bg-purple-600 text-white hover:bg-purple-700"
+                  }`}
+                  disabled={
+                    team.status === "Team full" ||
+                    team.currentMembers >= team.maxMembers
+                  }
+                >
+                  {team.status === "Team full" ||
+                  team.currentMembers >= team.maxMembers
+                    ? "Team Full"
+                    : "Request to Join"}
+                </button>
+              )}
             </div>
           ))}
         </div>

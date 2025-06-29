@@ -1,4 +1,4 @@
-/* globals.css */
+/* globals.css - FIXED VERSION */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -11,9 +11,10 @@ html,
 body {
   padding: 0;
   margin: 0;
-  font-family: "Inter", sans-serif; /* Default font */
-  background-color: #0d0c1d; /* Fallback for the darkest background */
-  overflow-x: hidden; /* Prevent horizontal scroll from animations */
+  font-family: "Inter", sans-serif;
+  background-color: #0d0c1d;
+  overflow-x: hidden;
+  height: 100%;
 }
 
 a {
@@ -23,6 +24,17 @@ a {
 
 * {
   box-sizing: border-box;
+}
+
+/* FIXED: Ensure buttons and interactive elements are clickable */
+button {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  pointer-events: auto; /* Still allow hover states for disabled buttons */
 }
 
 /* Custom utility classes for fonts */
@@ -36,14 +48,14 @@ a {
 
 /* Custom scrollbar hide for the sponsor carousel */
 .scrollbar-hide {
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 .scrollbar-hide::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
+  display: none;
 }
 
-/* Keyframe Animations */
+/* FIXED: Consolidated and corrected keyframe animations */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -77,6 +89,7 @@ a {
   }
 }
 
+/* FIXED: Single set of float animations (removed duplicates) */
 @keyframes float1 {
   0%,
   100% {
@@ -186,17 +199,14 @@ a {
   animation: float5 14s infinite ease-in-out;
 }
 
-/* Tailwind overrides for Swiper navigation buttons for better visibility */
-/* These make the default Swiper arrows visible and styled */
+/* FIXED: Improved Swiper navigation buttons */
 .swiper-button-prev,
 .swiper-button-next {
-  color: var(
-    --tw-text-opacity,
-    #ffffff
-  ) !important; /* Make arrows white by default */
+  color: #ffffff !important;
+  z-index: 10;
+  pointer-events: auto;
 }
 
-/* Ensure the custom class styling on the buttons in SponsorCarousel takes precedence */
 .swiper-button-prev.swiper-button-prev,
 .swiper-button-next.swiper-button-next {
   @apply !text-purple-400 !bg-gray-800/50 hover:!bg-gray-700/70 !w-10 !h-10 rounded-full flex items-center justify-center;
@@ -205,116 +215,76 @@ a {
   transform: translateY(-50%);
   z-index: 10;
   cursor: pointer;
-  transition: all 0.2s ease-in-out; /* Add transition for hover effect */
+  pointer-events: auto;
+  transition: all 0.2s ease-in-out;
 }
 
 .swiper-button-prev.swiper-button-prev {
-  left: -2px; /* Adjust position as needed */
+  left: -2px;
 }
 
 .swiper-button-next.swiper-button-next {
-  right: -2px; /* Adjust position as needed */
+  right: -2px;
 }
 
-/* Hide default Swiper pagination dots for more control, if needed (though `pb-12` on Swiper handles it) */
 .swiper-pagination-bullet {
-  background-color: #a78bfa !important; /* Purple for active dot */
+  background-color: #a78bfa !important;
   opacity: 0.5 !important;
 }
 
 .swiper-pagination-bullet-active {
   opacity: 1 !important;
-  background-color: #8b5cf6 !important; /* Darker purple for active dot */
+  background-color: #8b5cf6 !important;
 }
 
-/* Adjust top padding of main content to account for fixed header */
+/* FIXED: Adjust main content padding */
 main {
-  padding-top: 80px; /* Adjust based on header height */
+  padding-top: 80px;
+  position: relative;
+  z-index: 1;
 }
 
-
-
-/* Custom Animations */
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* FIXED: Ensure modals have proper z-index and don't interfere with clicks */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  pointer-events: auto;
 }
 
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.modal-content {
+  position: relative;
+  z-index: 51;
+  pointer-events: auto;
 }
 
-/* Floating background shapes animations */
-@keyframes float1 {
-  0% { transform: translate(0, 0); }
-  33% { transform: translate(5px, 10px); }
-  66% { transform: translate(-5px, 5px); }
-  100% { transform: translate(0, 0); }
+/* FIXED: Ensure no global pointer-events restrictions */
+.team-card {
+  pointer-events: auto;
 }
 
-@keyframes float2 {
-  0% { transform: translate(0, 0); }
-  33% { transform: translate(-10px, -5px); }
-  66% { transform: translate(5px, -10px); }
-  100% { transform: translate(0, 0); }
+.team-card button {
+  pointer-events: auto;
+  z-index: 2;
+  position: relative;
 }
 
-@keyframes float3 {
-  0% { transform: translate(0, 0); }
-  33% { transform: translate(10px, -10px); }
-  66% { transform: translate(-5px, 5px); }
-  100% { transform: translate(0, 0); }
+/* FIXED: Ensure forms work properly */
+form {
+  pointer-events: auto;
 }
 
-@keyframes float4 {
-  0% { transform: translate(0, 0); }
-  33% { transform: translate(-5px, 10px); }
-  66% { transform: translate(10px, -5px); }
-  100% { transform: translate(0, 0); }
+form button {
+  pointer-events: auto;
 }
 
-
-.animate-fade-in-down {
-  animation: fadeInDown 0.8s ease-out forwards;
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.8s ease-out forwards;
-}
-
-.animate-float-1 {
-  animation: float1 15s ease-in-out infinite alternate;
-}
-
-.animate-float-2 {
-  animation: float2 18s ease-in-out infinite alternate-reverse;
-}
-
-.animate-float-3 {
-  animation: float3 12s ease-in-out infinite alternate;
-}
-
-.animate-float-4 {
-  animation: float4 16s ease-in-out infinite alternate-reverse;
-}
-
-/* Base styles for HTML, body */
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden; /* Prevent horizontal scroll */
+/* FIXED: Debug class to test if buttons are clickable */
+.debug-clickable {
+  border: 2px solid red !important;
+  pointer-events: auto !important;
+  z-index: 999 !important;
+  position: relative !important;
 }

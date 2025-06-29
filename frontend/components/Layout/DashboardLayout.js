@@ -23,6 +23,11 @@ const DashboardLayout = ({ title, description, children }) => {
             description || "Your personal mAIple AI Conference dashboard."
           }
         />
+        {/*
+          REMOVE THESE TWO <link> TAGS FOR GOOGLE FONTS.
+          THEY SHOULD BE MOVED TO pages/_document.js
+        */}
+        {/*
         <link
           href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap"
           rel="stylesheet"
@@ -31,6 +36,7 @@ const DashboardLayout = ({ title, description, children }) => {
           href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800;900&display=swap"
           rel="stylesheet"
         />
+        */}
       </Head>
 
       <div className="min-h-screen bg-gradient-to-br from-gray-950 via-indigo-950 to-purple-950 text-white font-inter flex flex-col overflow-x-hidden">
