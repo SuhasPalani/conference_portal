@@ -197,7 +197,7 @@ def dashboard():
     current_user_data = get_jwt_identity()
     user_id = current_user_data.get("id")
 
-    user = User.find_by_id(user_id) # Fetch latest user from DB
+    user = User.find_by_id(user_id)  # Fetch latest user from DB
 
     if not user:
         return jsonify({"message": "User not found."}), 404
@@ -226,7 +226,7 @@ def dashboard():
             "message": f"Welcome to your dashboard, {user.full_name}!",
             "user": user.to_dict(),
             "conferenceInfo": conference_info,
-            "token": latest_access_token # <--- Return the new token here
+            "token": latest_access_token,  # <--- Return the new token here
         }
     ), 200
 
@@ -384,9 +384,12 @@ def update_user_status(user_id):
 @api_bp.route("/contact", methods=["POST", "OPTIONS"])
 def contact_form_submit():
     if request.method == "OPTIONS":
-        return "", 200  # <-- ADDED
+        return "", 200
+
     try:
         data = request.get_json()
+        current_app.logger.info(f"Received contact form data: {data}")
+
         name = data.get("name")
         email = data.get("email")
         subject = data.get("subject")
@@ -397,30 +400,15 @@ def contact_form_submit():
                 {"success": False, "message": "All fields are required."}
             ), 400
 
-        template_params = {
-            "from_name": name,
-            "from_email": email,
-            "subject": subject,
-            "message": message,
-            "to_name": "mAIple Support Team",
-            "title": "New Contact Message",  # Add this line, or whatever dynamic title you want
-        }
-
-        email_result = send_email_via_emailjs(
-            Config.EMAILJS_TEMPLATE_CONTACT_US_ID, template_params, Config.ADMIN_EMAIL
-        )
-
-        if email_result["success"]:
-            return jsonify(
-                {"success": True, "message": "Your message has been sent successfully!"}
-            ), 200
-        else:
-            return jsonify(
-                {
-                    "success": False,
-                    "message": email_result["message"] or "Failed to send message.",
-                }
-            ), 500
+        # The backend now ONLY receives the data and confirms receipt.
+        # It does NOT send the email via EmailJS.
+        current_app.logger.info(f"Contact form data received and validated: {data}")
+        return jsonify(
+            {
+                "success": True,
+                "message": "Your message has been received by the server!",
+            }
+        ), 200
 
     except Exception as e:
         current_app.logger.error(
@@ -429,7 +417,7 @@ def contact_form_submit():
         return jsonify(
             {
                 "success": False,
-                "message": "An unexpected error occurred while sending your message.",
+                "message": "An unexpected error occurred while processing your message.",
             }
         ), 500
 

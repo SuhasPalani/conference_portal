@@ -1,3 +1,4 @@
+// lib/auth.js
 import { jwtDecode } from "jwt-decode"; // Correct import for jwt-decode library
 import emailjs from "@emailjs/browser"; // Import EmailJS for frontend use
 
@@ -5,6 +6,21 @@ import emailjs from "@emailjs/browser"; // Import EmailJS for frontend use
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const TOKEN_KEY = "token"; // Consistent key for localStorage
 const USER_DATA_KEY = "user_data"; // Key for storing user object
+
+// Initialize EmailJS with your public key
+// This ensures EmailJS is only initialized once and only in the browser.
+if (
+  typeof window !== "undefined" &&
+  process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY
+) {
+  emailjs.init(process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY);
+  console.log(
+    "EmailJS initialized with public key:",
+    process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY
+  );
+} else if (typeof window !== "undefined") {
+  console.warn("EmailJS public key is not set. Email sending might not work.");
+}
 
 /**
  * Stores the JWT token in local storage.
@@ -274,9 +290,12 @@ export const callApi = async (endpoint, method = "GET", body = null) => {
     console.log(
       `DEBUG FE: API Response Status for ${endpoint}: ${response.status}`
     );
-    console.log(`DEBUG FE: API Response Headers for ${endpoint}:`, [
-      ...response.headers.entries(),
-    ]);
+    // Note: response.headers can only be read once from a stream.
+    // Convert to array for logging if you need to inspect them.
+    console.log(
+      `DEBUG FE: API Response Headers for ${endpoint}:`,
+      Object.fromEntries(response.headers.entries())
+    );
     const responseText = await response.text(); // Read as text first
     console.log(
       `DEBUG FE: API Response Raw Text for ${endpoint}:`,
@@ -431,13 +450,30 @@ export const updateUserRoleStatus = async (userId, role, status) => {
 };
 
 /**
- * Submits the contact form data to the backend.
+ * Submits the contact form data to the backend AND sends email via EmailJS (frontend).
  * @param {object} formData - Object containing name, email, subject, message.
  * @returns {Promise<object>} Object with `success` boolean or `message`.
  */
 export const submitContactForm = async (formData) => {
+  const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID;
+  const templateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_CONTACT_US_ID;
+  const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY; // Used in emailjs.init
+
+  if (!serviceId || !templateId || !publicKey) {
+    console.error(
+      "EmailJS environment variables (service ID, template ID, or public key) are not set."
+    );
+    return {
+      success: false,
+      message:
+        "Email service not configured properly. Please check environment variables.",
+    };
+  }
+
   try {
-    const response = await fetch(`${BACKEND_URL}/contact`, {
+    // Step 1: Send data to your backend (for logging/storage, optional but good practice)
+    console.log("Sending contact form data to backend...");
+    const backendResponse = await fetch(`${BACKEND_URL}/contact`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -445,20 +481,62 @@ export const submitContactForm = async (formData) => {
       body: JSON.stringify(formData),
     });
 
-    const data = await response.json();
-    if (!response.ok) {
+    const backendData = await backendResponse.json();
+    if (!backendResponse.ok) {
+      console.error(
+        "Backend failed to acknowledge contact form data:",
+        backendData.message
+      );
+      // You might still try to send the email if backend acknowledged, but for robustness,
+      // if backend fails, we assume something is wrong and stop.
       return {
         success: false,
-        message: data.message || "Failed to send message.",
+        message: backendData.message || "Failed to submit form to server.",
       };
     }
-    return {
-      success: true,
-      message: data.message || "Message sent successfully!",
+    console.log("Backend acknowledged contact form data:", backendData.message);
+
+    // Step 2: Send email via EmailJS from the frontend
+    const emailParams = {
+      from_name: formData.name,
+      from_email: formData.email,
+      subject: formData.subject,
+      message: formData.message,
+      to_name: "mAIple Support Team", // Matches what was expected in backend's old `template_params`
+      title: "New Contact Message", // Matches what was expected in backend's old `template_params`
     };
+
+    console.log("Attempting to send email via EmailJS from frontend...");
+    // The fourth argument to emailjs.send is the user ID (public key), which was set in emailjs.init
+    const emailJsResponse = await emailjs.send(
+      serviceId,
+      templateId,
+      emailParams
+    );
+    console.log("EmailJS raw response:", emailJsResponse);
+
+    if (emailJsResponse.status === 200) {
+      console.log("Email successfully sent via EmailJS!");
+      return {
+        success: true,
+        message: "Your message has been sent successfully!",
+      };
+    } else {
+      console.error("EmailJS sending failed:", emailJsResponse.text);
+      return {
+        success: false,
+        message: emailJsResponse.text || "Failed to send email via EmailJS.",
+      };
+    }
   } catch (error) {
-    console.error("Error submitting contact form:", error);
-    return { success: false, message: "Network error or server unavailable." };
+    console.error(
+      "Error during contact form submission or email sending:",
+      error
+    );
+    return {
+      success: false,
+      message: "An unexpected error occurred. Please try again later.",
+    };
   }
 };
 
@@ -561,3 +639,4 @@ export const disbandTeam = async (teamId) => {
   const result = await callApi(`/teams/${teamId}/disband`, "DELETE");
   return result; // result will contain success, message, user, and token
 };
+z
