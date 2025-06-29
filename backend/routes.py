@@ -1,5 +1,4 @@
 # backend/routes.py
-# backend/routes.py
 from flask import Blueprint, request, jsonify, redirect, url_for, current_app, g
 from models import User, mongo, BlacklistToken
 from auth import oauth, handle_oauth_callback
