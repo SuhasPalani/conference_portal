@@ -1,7 +1,10 @@
 from flask import Blueprint, request, jsonify, current_app
 from models import User, Team, mongo  # Import Team model
-from auth import jwt_required, get_jwt_identity  # For authentication
-from flask_jwt_extended import create_access_token
+from auth import (
+    jwt_required,
+    get_jwt_identity,
+    create_access_token,
+)  # Ensure create_access_token is imported here
 from bson import ObjectId  # For working with MongoDB ObjectIds
 from functools import wraps
 
@@ -69,8 +72,6 @@ def connect_with_mentor(user_id):
                 {"success": False, "message": "Mentor not found or not active."}
             ), 404
 
-        # In a real app, you'd record this connection request in the DB
-        # For now, simulate success
         current_app.logger.info(
             f"User {requester_id} attempting to connect with mentor {user_id}"
         )
@@ -85,10 +86,11 @@ def connect_with_mentor(user_id):
 
 
 # --- Team Routes ---
-# In your get_teams route
-@community_bp.route("/teams", methods=["GET"])
+@community_bp.route("/teams", methods=["GET", "OPTIONS"])  # Ensure OPTIONS is here
 @jwt_required()
 def get_teams():
+    if request.method == "OPTIONS":  # Explicitly handle OPTIONS for CORS
+        return "", 200
     try:
         search_term = request.args.get("search", "")
         category = request.args.get("category", "")
@@ -96,31 +98,36 @@ def get_teams():
         teams = Team.get_all_teams(search_term=search_term, category=category)
         teams_data = []
         for team in teams:
-            team_dict = team.to_dict()  # Get the dictionary representation
-            # Add leader's full_name to the dictionary for frontend display
+            team_dict = team.to_dict()
+
+            # --- CRITICAL FIX FOR LEADER DATA ---
             leader = User.find_by_id(team.leader_id)
             if leader:
                 team_dict["leader"] = {
                     "full_name": leader.full_name,
                     "id": str(leader._id),
+                    "email": leader.email,  # Include email for potential future use
                 }
             else:
-                team_dict["leader"] = None  # Or handle as appropriate
+                team_dict["leader"] = None
+            # --- END CRITICAL FIX ---
 
             # Ensure 'status' is updated based on current members before sending
-            # The frontend expects 'status' to reflect "Team full" etc.
-            if len(team.members) >= team.max_members:
+            if team_dict["current_members"] >= team_dict["max_members"]:
                 team_dict["status"] = "Team full"
-            elif len(team.members) >= team.max_members * 0.8:  # Example: 80% full
+            elif (
+                team_dict["current_members"] > 0
+                and team_dict["current_members"] >= team_dict["max_members"] * 0.8
+            ):
                 team_dict["status"] = "Almost full"
             else:
                 team_dict["status"] = "Looking for members"
 
-            teams_data.append(team_dict)  # Append the dictionary, not the Team object
+            teams_data.append(team_dict)
 
         return jsonify({"success": True, "data": teams_data}), 200
     except Exception as e:
-        current_app.logger.error(f"Error fetching teams: {e}")
+        current_app.logger.error(f"Error fetching teams: {e}", exc_info=True)
         return jsonify({"success": False, "message": "Failed to fetch teams."}), 500
 
 
@@ -147,7 +154,6 @@ def create_team():
         ), 400
 
     try:
-        # Check if user is already in a team
         user_in_db = User.find_by_id(leader_id)
         if user_in_db.team_id:
             return jsonify(
@@ -157,7 +163,6 @@ def create_team():
                 }
             ), 409
 
-        # Check if team name already exists
         existing_team = mongo.db.teams.find_one({"name": name})
         if existing_team:
             return jsonify(
@@ -173,13 +178,11 @@ def create_team():
             current_app.logger.error(f"Failed to create team for leader {leader_id}")
             return jsonify({"success": False, "message": "Failed to create team."}), 500
 
-        # Update leader's user record to reflect team membership
         user_in_db.team_id = team_id
         user_in_db.team_name = name
         user_in_db.save()
 
-        # Generate a new token for the leader with updated team info
-        updated_leader_user = User.find_by_id(leader_id)  # Re-fetch to get latest state
+        updated_leader_user = User.find_by_id(leader_id)
         new_leader_token = create_access_token(identity=updated_leader_user.to_dict())
 
         return (
@@ -188,8 +191,8 @@ def create_team():
                     "success": True,
                     "message": "Team created successfully!",
                     "team": new_team.to_dict(),
-                    "user": updated_leader_user.to_dict(),  # Return updated user for frontend context
-                    "token": new_leader_token,  # Return new token for frontend context
+                    "user": updated_leader_user.to_dict(),
+                    "token": new_leader_token,
                 }
             ),
             201,
@@ -235,7 +238,6 @@ def join_team(team_id):
         if len(team.members) >= team.max_members:
             return jsonify({"success": False, "message": "Team is full."}), 409
 
-        # Check if user is already in another team
         user_in_db = User.find_by_id(requester_id)
         if user_in_db.team_id:
             return jsonify(
@@ -250,13 +252,11 @@ def join_team(team_id):
             team.status = "Full"
         team.save()
 
-        # Update joining user's record
         user_in_db.team_id = team._id
         user_in_db.team_name = team.name
         user_in_db.save()
 
-        # Generate a new token for the joining user with updated team info
-        updated_user = User.find_by_id(requester_id)  # Re-fetch to get latest state
+        updated_user = User.find_by_id(requester_id)
         new_user_token = create_access_token(identity=updated_user.to_dict())
 
         return (
@@ -265,8 +265,8 @@ def join_team(team_id):
                     "success": True,
                     "message": f"Successfully joined team '{team.name}'!",
                     "team": team.to_dict(),
-                    "user": updated_user.to_dict(),  # Return updated user for frontend context
-                    "token": new_user_token,  # Return new token for frontend context
+                    "user": updated_user.to_dict(),
+                    "token": new_user_token,
                 }
             ),
             200,
@@ -304,7 +304,6 @@ def leave_team(team_id):
             ), 400
 
         if team.leader_id == ObjectId(user_id):
-            # Option: Disband team if leader leaves and no members, or transfer leadership
             return jsonify(
                 {
                     "success": False,
@@ -313,17 +312,15 @@ def leave_team(team_id):
             ), 403
 
         team.members.remove(ObjectId(user_id))
-        team.status = "Looking for members"  # Status changes as a member left
+        team.status = "Looking for members"
         team.save()
 
-        # Update leaving user's record
         user_in_db = User.find_by_id(user_id)
         user_in_db.team_id = None
         user_in_db.team_name = None
         user_in_db.save()
 
-        # Generate a new token for the leaving user with updated team info
-        updated_user = User.find_by_id(user_id)  # Re-fetch to get latest state
+        updated_user = User.find_by_id(user_id)
         new_user_token = create_access_token(identity=updated_user.to_dict())
 
         return (
@@ -332,8 +329,8 @@ def leave_team(team_id):
                     "success": True,
                     "message": f"Successfully left team '{team.name}'.",
                     "team": team.to_dict(),
-                    "user": updated_user.to_dict(),  # Return updated user for frontend context
-                    "token": new_user_token,  # Return new token for frontend context
+                    "user": updated_user.to_dict(),
+                    "token": new_user_token,
                 }
             ),
             200,
@@ -346,7 +343,6 @@ def leave_team(team_id):
         ), 500
 
 
-# Endpoint to disband a team (only by leader)
 @community_bp.route("/teams/<team_id>/disband", methods=["DELETE", "OPTIONS"])
 @jwt_required()
 def disband_team(team_id):
@@ -374,16 +370,13 @@ def disband_team(team_id):
                 }
             ), 403
 
-        # Clear team_id and team_name for all members
         mongo.db.users.update_many(
             {"_id": {"$in": team.members}},
             {"$set": {"team_id": None, "team_name": None}},
         )
 
-        # Delete the team
         mongo.db.teams.delete_one({"_id": team._id})
 
-        # Update the leader's user record (if they are still logged in)
         updated_leader_user = User.find_by_id(user_id)
         new_leader_token = None
         if updated_leader_user:
@@ -395,10 +388,8 @@ def disband_team(team_id):
             {
                 "success": True,
                 "message": f"Team '{team.name}' disbanded successfully.",
-                "user": updated_leader_user.to_dict()
-                if updated_leader_user
-                else None,  # For immediate context update
-                "token": new_leader_token,  # New token if leader is still logged in
+                "user": updated_leader_user.to_dict() if updated_leader_user else None,
+                "token": new_leader_token,
             }
         ), 200
 
@@ -409,4 +400,37 @@ def disband_team(team_id):
                 "success": False,
                 "message": "An error occurred while disbanding the team.",
             }
+        ), 500
+
+
+@community_bp.route("/teammates", methods=["GET", "OPTIONS"])
+@jwt_required()
+def get_potential_teammates():
+    if request.method == "OPTIONS":
+        return "", 200
+
+    current_user_identity = get_jwt_identity()
+    current_user_id = current_user_identity.get("id")
+    current_user_interests = current_user_identity.get(
+        "interests", []
+    )  # Get current user's interests for matching
+
+    search_term = request.args.get("search", "")
+
+    try:
+        teammates = User.find_potential_teammates(
+            current_user_id=current_user_id,
+            search_term=search_term,
+            interests=current_user_interests,  # Pass current user's interests for filtering
+        )
+        teammates_data = [
+            t.to_dict() for t in teammates
+        ]  # Converts User objects to dictionaries
+        return jsonify({"success": True, "teammates": teammates_data}), 200
+    except Exception as e:
+        current_app.logger.error(
+            f"Error fetching potential teammates: {e}", exc_info=True
+        )
+        return jsonify(
+            {"success": False, "message": "Failed to fetch potential teammates."}
         ), 500

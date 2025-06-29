@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
 
       if (decoded) {
         // Construct the user object from the decoded token payload (sub contains the identity dict)
-        const userObj = {
+        const userObj = {   
           id: decoded.sub?.id || decoded.id, // Prefer sub.id, fallback to id
           fullName:
             decoded.sub?.full_name || decoded.full_name || decoded.fullName,

@@ -1,302 +1,384 @@
-// frontend/pages/find-mentors.js
-import React, { useEffect, useState } from "react";
-import { useRouter } from "next/router";
-import { useAuth } from "../contexts/AuthContext";
-import { callApi } from "../lib/auth";
-import DashboardLayout from "../components/Layout/DashboardLayout";
-import LoadingSpinner from "../components/LoadingSpinner";
-import ErrorMessage from "../components/ErrorMessage";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext"; // Adjust path as needed
+import Head from "next/head";
+import { useRouter } from "next/router"; // Import useRouter for navigation
 
 const FindMentorsPage = () => {
+  const { user, isLoggedIn, loadingAuth } = useAuth();
   const router = useRouter();
-  const { user, isLoggedIn, loadingAuth, logout } = useAuth();
 
+  // State for Mentors
   const [mentors, setMentors] = useState([]);
-  const [loadingData, setLoadingData] = useState(true);
-  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSkill, setSelectedSkill] = useState("");
+  const [skillFilter, setSkillFilter] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Dummy data for placeholder
-  const dummyMentors = [
-    {
-      id: 1,
-      name: "Dr. Sarah Chen",
-      title: "Senior AI Research Scientist",
-      company: "Google DeepMind",
-      expertise: ["Machine Learning", "Computer Vision", "Neural Networks"],
-      bio: "10+ years in AI research with focus on computer vision and deep learning applications.",
-      availability: "Available",
-      profileImage: "/api/placeholder/150/150",
-    },
-    {
-      id: 2,
-      name: "Michael Rodriguez",
-      title: "Head of AI Product",
-      company: "OpenAI",
-      expertise: [
-        "Natural Language Processing",
-        "Product Strategy",
-        "AI Ethics",
-      ],
-      bio: "Leading AI product development and ensuring responsible AI deployment.",
-      availability: "Limited",
-      profileImage: "/api/placeholder/150/150",
-    },
-    {
-      id: 3,
-      name: "Dr. Priya Patel",
-      title: "AI Startup Founder",
-      company: "VisionAI Inc.",
-      expertise: ["Entrepreneurship", "Computer Vision", "Startup Strategy"],
-      bio: "Founded 3 AI startups, specializing in computer vision for healthcare applications.",
-      availability: "Available",
-      profileImage: "/api/placeholder/150/150",
-    },
-    {
-      id: 4,
-      name: "James Kim",
-      title: "Senior ML Engineer",
-      company: "Tesla",
-      expertise: ["Autonomous Vehicles", "Deep Learning", "Robotics"],
-      bio: "Working on self-driving car technology and robotics applications.",
-      availability: "Available",
-      profileImage: "/api/placeholder/150/150",
-    },
-  ];
-
-  const skills = [
-    "Machine Learning",
-    "Computer Vision",
-    "Natural Language Processing",
-    "Robotics",
-    "AI Ethics",
-    "Product Strategy",
-    "Entrepreneurship",
-    "Deep Learning",
-  ];
-
-  useEffect(() => {
-    if (loadingAuth) return;
-
-    if (!isLoggedIn) {
-      console.log("Not logged in, redirecting to login.");
-      router.replace("/login");
-      return;
-    }
-
-    const fetchMentors = async () => {
-      setLoadingData(true);
-      setError("");
-
-      try {
-        if (!user) {
-          console.error("User missing in AuthContext, initiating logout.");
-          logout();
-          router.replace("/");
-          return;
-        }
-
-        // In a real application, you would call your API here
-        // const response = await callApi("/mentors", "GET");
-
-        // For now, using dummy data
-        setTimeout(() => {
-          setMentors(dummyMentors);
-          setLoadingData(false);
-        }, 1000);
-      } catch (err) {
-        console.error("Error fetching mentors:", err);
-        setError("Network error or server unavailable.");
-        setLoadingData(false);
-      }
-    };
-
-    fetchMentors();
-  }, [isLoggedIn, loadingAuth, router, user, logout]);
-
-  const handleConnectMentor = async (mentorId) => {
+  // --- Fetch Mentors Logic ---
+  const fetchMentors = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      // In a real application, you would call your API here
-      // const response = await callApi(`/mentors/${mentorId}/connect`, "POST");
+      const token = user?.token;
+      if (!token) {
+        setError("Authentication token not found. Please log in.");
+        setLoading(false);
+        return;
+      }
 
-      // For now, just show an alert
-      alert(`Connection request sent to mentor ${mentorId}!`);
+      const queryParams = new URLSearchParams();
+      if (searchTerm) {
+        queryParams.append("search", searchTerm);
+      }
+      if (skillFilter) {
+        queryParams.append("skill", skillFilter);
+      }
+
+      const response = await fetch(
+        `${
+          process.env.NEXT_PUBLIC_API_BASE_URL
+        }/mentors?${queryParams.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        setMentors(result.mentors);
+      } else {
+        setError(result.message || "Failed to fetch mentors.");
+      }
     } catch (err) {
-      console.error("Error connecting to mentor:", err);
-      setError("Failed to send connection request.");
+      console.error("Error fetching mentors:", err);
+      setError("An unexpected error occurred while fetching mentors.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const filteredMentors = mentors.filter((mentor) => {
-    const matchesSearch =
-      mentor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mentor.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      mentor.title.toLowerCase().includes(searchTerm.toLowerCase());
+  // --- Connect with Mentor Logic ---
+  const handleConnectWithMentor = async (mentorId) => {
+    if (!user) {
+      alert("You must be logged in to connect with a mentor.");
+      return;
+    }
 
-    const matchesSkill =
-      selectedSkill === "" || mentor.expertise.includes(selectedSkill);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/mentors/${mentorId}/connect`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${user.token}`,
+          },
+        }
+      );
+      const result = await response.json();
+      if (response.ok) {
+        alert(result.message || "Connection request sent successfully!");
+      } else {
+        alert(result.message || "Failed to send connection request.");
+      }
+    } catch (err) {
+      console.error("Error connecting with mentor:", err);
+      alert("An error occurred while trying to connect with the mentor.");
+    }
+  };
 
-    return matchesSearch && matchesSkill;
-  });
+  // --- Contact Mentor via Email ---
+  const handleContactMentor = (mentor) => {
+    const subject = encodeURIComponent(
+      "Mentorship Request - Conference Portal"
+    );
+    const body = encodeURIComponent(
+      `Hi ${
+        mentor.full_name
+      },\n\nI found your profile on the Conference Portal and would like to discuss potential mentorship opportunities.\n\nI'm particularly interested in your expertise in: ${
+        mentor.skills ? mentor.skills.join(", ") : "your field"
+      }\n\nBest regards,\n${user.full_name}`
+    );
+    window.location.href = `mailto:${mentor.email}?subject=${subject}&body=${body}`;
+  };
+
+  // --- Effects to trigger fetches based on search terms ---
+  useEffect(() => {
+    if (!loadingAuth && isLoggedIn) {
+      fetchMentors();
+    } else if (!loadingAuth && !isLoggedIn) {
+      setError("Please log in to view mentors.");
+      setLoading(false);
+    }
+  }, [isLoggedIn, loadingAuth, searchTerm, skillFilter]);
 
   if (loadingAuth) {
-    return <LoadingSpinner message="Verifying authentication..." />;
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-900 text-white">
+        Loading authentication...
+      </div>
+    );
   }
 
   if (!isLoggedIn) {
-    return null;
-  }
-
-  if (loadingData) {
-    return <LoadingSpinner message="Loading mentors..." />;
-  }
-
-  if (error) {
-    return <ErrorMessage message={error} />;
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-gray-900 text-yellow-400">
+        You need to be logged in to access mentor features.
+      </div>
+    );
   }
 
   return (
-    <DashboardLayout
-      title="Find Mentors - mAIple Conference Portal"
-      description="Connect with AI industry experts and mentors."
-    >
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Find Mentors</h1>
-          <p className="text-gray-300">
-            Connect with industry experts and experienced professionals who can
-            guide your AI journey.
-          </p>
-        </div>
-
-        {/* Search and Filter Section */}
-        <div className="bg-gray-800 bg-opacity-70 rounded-lg shadow-md p-6 mb-8 border border-gray-700">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="search"
-                className="block text-sm font-medium text-gray-200 mb-2"
-              >
-                Search Mentors
-              </label>
-              <input
-                type="text"
-                id="search"
-                className="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                placeholder="Search by name, company, or title..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="skill"
-                className="block text-sm font-medium text-gray-200 mb-2"
-              >
-                Filter by Expertise
-              </label>
-              <select
-                id="skill"
-                className="w-full px-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                value={selectedSkill}
-                onChange={(e) => setSelectedSkill(e.target.value)}
-              >
-                <option value="">All Skills</option>
-                {skills.map((skill) => (
-                  <option key={skill} value={skill}>
-                    {skill}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Mentors Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredMentors.map((mentor) => (
-            <div
-              key={mentor.id}
-              className="bg-gray-800 bg-opacity-70 rounded-lg shadow-md overflow-hidden border border-gray-700"
+    <div className="min-h-screen bg-gray-900 text-gray-100 p-8 font-inter">
+      <Head>
+        <title>Find Mentors - Conference Portal</title>
+      </Head>
+      <div className="container mx-auto bg-gray-800 p-6 rounded-lg shadow-2xl animate-fade-in">
+        <div className="flex justify-between items-center mb-6">
+          <button
+            onClick={() => router.back()}
+            className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md transition duration-200 flex items-center gap-2"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              viewBox="0 0 20 20"
+              fill="currentColor"
             >
-              <div className="p-6">
-                <div className="flex items-center mb-4">
-                  <div className="w-16 h-16 bg-purple-600 rounded-full flex items-center justify-center mr-4 text-white font-bold text-xl">
-                    {/* Placeholder for initials or image */}
-                    {mentor.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">
-                      {mentor.name}
-                    </h3>
-                    <p className="text-sm text-gray-300">{mentor.title}</p>
-                    <p className="text-sm text-purple-400 font-medium">
-                      {mentor.company}
-                    </p>
-                  </div>
-                </div>
+              <path
+                fillRule="evenodd"
+                d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Back
+          </button>
+          <h1 className="text-3xl font-montserrat font-extrabold text-purple-400 text-center flex-grow">
+            Find Mentors
+          </h1>
+          <div className="w-20"></div> {/* Spacer for alignment */}
+        </div>
 
-                <p className="text-gray-300 text-sm mb-4 line-clamp-3">
-                  {mentor.bio}
-                </p>
+        <div className="animate-fade-in-down">
+          <h2 className="text-2xl font-semibold text-gray-200 mb-4">
+            Connect with Expert Mentors
+          </h2>
+          <div className="mb-6 flex flex-col sm:flex-row gap-4">
+            <input
+              type="text"
+              placeholder="Search by name, expertise, or bio..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-grow p-3 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-700 text-gray-200"
+            />
+            <input
+              type="text"
+              placeholder="Filter by specific skill..."
+              value={skillFilter}
+              onChange={(e) => setSkillFilter(e.target.value)}
+              className="p-3 border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-700 text-gray-200"
+            />
+            <button
+              onClick={fetchMentors}
+              className="bg-purple-600 text-white px-6 py-3 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition duration-200"
+            >
+              Search
+            </button>
+          </div>
 
-                <div className="mb-4">
-                  <h4 className="text-sm font-medium text-white mb-2">
-                    Expertise:
-                  </h4>
-                  <div className="flex flex-wrap gap-1">
-                    {mentor.expertise.map((skill) => (
-                      <span
-                        key={skill}
-                        className="px-2 py-1 bg-blue-700 text-blue-100 text-xs rounded-full"
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span
-                    className={`px-2 py-1 text-xs rounded-full ${
-                      mentor.availability === "Available"
-                        ? "bg-green-700 text-green-100"
-                        : "bg-yellow-700 text-yellow-100"
-                    }`}
-                  >
-                    {mentor.availability}
-                  </span>
-
-                  <button
-                    onClick={() => handleConnectMentor(mentor.id)}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                      mentor.availability === "Available"
-                        ? "bg-purple-600 text-white hover:bg-purple-700"
-                        : "bg-gray-600 text-gray-300 cursor-not-allowed"
-                    }`}
-                    disabled={mentor.availability !== "Available"}
-                  >
-                    Connect
-                  </button>
-                </div>
+          {loading ? (
+            <div className="text-center text-gray-400 p-8">
+              <div className="animate-pulse">
+                <div className="text-lg mb-2">Searching for mentors...</div>
+                <div className="text-sm">Finding expert mentors for you</div>
               </div>
             </div>
-          ))}
-        </div>
+          ) : error ? (
+            <div className="text-center text-red-400 p-8">
+              <p className="text-lg font-semibold mb-2">Error</p>
+              <p>{error}</p>
+            </div>
+          ) : mentors.length === 0 ? (
+            <div className="text-center text-gray-400 p-8">
+              <p className="text-lg mb-2">No mentors found.</p>
+              <p className="text-sm">
+                Try adjusting your search terms or check back later as more
+                mentors join.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {mentors.map((mentor) => (
+                <div
+                  key={mentor.id}
+                  className="bg-gray-700 p-6 rounded-lg shadow-lg border border-gray-600 mentor-card animate-fade-in-up"
+                >
+                  <div className="flex items-center mb-4">
+                    <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center mr-4">
+                      <span className="text-white font-bold text-xl">
+                        {mentor.full_name.charAt(0).toUpperCase()}
+                      </span>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-purple-300">
+                        {mentor.full_name}
+                      </h3>
+                      <p className="text-gray-400 text-sm">{mentor.email}</p>
+                      <span className="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-green-700 text-green-100 mt-1">
+                        {mentor.role}
+                      </span>
+                    </div>
+                  </div>
 
-        {filteredMentors.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">
-              No mentors found matching your criteria.
-            </p>
-          </div>
-        )}
+                  {/* Bio/Description */}
+                  {mentor.bio && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-300 mb-1">About:</h4>
+                      <p className="text-gray-400 text-sm">{mentor.bio}</p>
+                    </div>
+                  )}
+
+                  {/* Company/Organization */}
+                  {mentor.company && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-300 mb-1">
+                        Organization:
+                      </h4>
+                      <p className="text-gray-400 text-sm">{mentor.company}</p>
+                    </div>
+                  )}
+
+                  {/* Years of Experience */}
+                  {mentor.years_of_experience && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-300 mb-1">
+                        Experience:
+                      </h4>
+                      <p className="text-gray-400 text-sm">
+                        {mentor.years_of_experience} years
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Skills/Expertise */}
+                  {mentor.skills && mentor.skills.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-300 mb-2">
+                        Expertise:
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {mentor.skills.map((skill, idx) => (
+                          <span
+                            key={idx}
+                            className="bg-blue-800 text-blue-200 text-xs px-2.5 py-0.5 rounded-full"
+                          >
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Specializations */}
+                  {mentor.specializations &&
+                    mentor.specializations.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="font-medium text-gray-300 mb-2">
+                          Specializations:
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {mentor.specializations.map((spec, idx) => (
+                            <span
+                              key={idx}
+                              className="bg-purple-800 text-purple-200 text-xs px-2.5 py-0.5 rounded-full"
+                            >
+                              {spec}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* LinkedIn Profile */}
+                  {mentor.linkedin_profile && (
+                    <div className="mb-4">
+                      <h4 className="font-medium text-gray-300 mb-1">
+                        LinkedIn:
+                      </h4>
+                      <a
+                        href={mentor.linkedin_profile}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 text-sm underline"
+                      >
+                        View Profile
+                      </a>
+                    </div>
+                  )}
+
+                  {/* Availability Status */}
+                  <div className="mb-4">
+                    <h4 className="font-medium text-gray-300 mb-1">Status:</h4>
+                    <span
+                      className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${
+                        mentor.availability_status === "Available"
+                          ? "bg-green-700 text-green-100"
+                          : mentor.availability_status === "Limited"
+                          ? "bg-yellow-700 text-yellow-100"
+                          : "bg-red-700 text-red-100"
+                      }`}
+                    >
+                      {mentor.availability_status || "Available"}
+                    </span>
+                  </div>
+
+                  {/* Mentorship Areas */}
+                  {mentor.mentorship_areas &&
+                    mentor.mentorship_areas.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="font-medium text-gray-300 mb-2">
+                          Mentorship Areas:
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {mentor.mentorship_areas.map((area, idx) => (
+                            <span
+                              key={idx}
+                              className="bg-green-800 text-green-200 text-xs px-2.5 py-0.5 rounded-full"
+                            >
+                              {area}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Action Buttons */}
+                  <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={() => handleContactMentor(mentor)}
+                      className="flex-1 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition duration-200"
+                    >
+                      Contact via Email
+                    </button>
+                    <button
+                      onClick={() => handleConnectWithMentor(mentor.id)}
+                      className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-200"
+                    >
+                      Send Connection
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-    </DashboardLayout>
+    </div>
   );
 };
 

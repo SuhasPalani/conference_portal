@@ -1,4 +1,3 @@
-# backend/models.py
 from flask_pymongo import PyMongo
 from werkzeug.security import generate_password_hash, check_password_hash
 from bson.objectid import ObjectId
@@ -209,7 +208,9 @@ class User:
         return [User.from_mongo_doc(doc) for doc in mentors_cursor]
 
     @staticmethod
-    def find_potential_teammates(current_user_id, search_term="", interests=[]):
+    def find_potential_teammates(
+        current_user_id, search_term="", interests=None
+    ):  # Changed interests=[] to interests=None
         """
         Finds active 'Regular User's who are not in a team,
         and whose interests overlap with provided interests,
@@ -226,11 +227,12 @@ class User:
             query["$or"] = [
                 {"full_name": {"$regex": search_term, "$options": "i"}},
                 {"email": {"$regex": search_term, "$options": "i"}},
-                # Consider adding search by interests if they are long enough
             ]
 
-        # Filter by interests overlap
-        if interests:
+        # Filter by interests overlap only if interests are provided and not empty
+        if (
+            interests and len(interests) > 0
+        ):  # Ensure interests is not None and not empty
             query["interests"] = {
                 "$in": interests
             }  # Match if any of user's interests are in the search list
