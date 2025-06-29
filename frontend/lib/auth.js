@@ -639,4 +639,3 @@ export const disbandTeam = async (teamId) => {
   const result = await callApi(`/teams/${teamId}/disband`, "DELETE");
   return result; // result will contain success, message, user, and token
 };
-z
