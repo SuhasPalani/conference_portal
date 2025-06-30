@@ -26,11 +26,30 @@ const DashboardContent = ({ user, conferenceInfo }) => {
         Here's your personalized overview for the mAIple AI Conference.
       </p>
 
-      {/* Role Pending Notification */}
+      {/* Combined Pending Status Notification */}
       {isPendingUser && (
         <div className="mb-8">
           <Alert
-            message="Your role is currently pending assignment. Once assigned, your dashboard will be updated with more features."
+            message={
+              <>
+                Your role is currently pending assignment. Once assigned, your
+                dashboard will be updated with more features.
+                <br />
+                <br />
+                All new users' status will be set to{" "}
+                <strong>inactive</strong>. Our backend team will review your
+                profile. Once your status changes, you will receive an email.
+                <br />
+                <br />
+                Please check your <strong>spam or promotions</strong> folder
+                within 24–48 hours. Follow the instructions in the email to
+                proceed.
+                <br />
+                <br />
+                If you don’t receive any communication, please use the{" "}
+                <strong>contact form</strong> to reach out.
+              </>
+            }
             type="info"
           />
         </div>
