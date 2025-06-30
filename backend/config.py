@@ -49,3 +49,7 @@ class Config:
     ADMIN_EMAIL = os.environ.get(
         "ADMIN_EMAIL", "admin@maiple.com"
     )  # Default admin email for notifications
+    SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
+    SENDGRID_SENDER_EMAIL = os.environ.get(
+        "SENDGRID_SENDER_EMAIL", "sugipics23@gmail.com"
+    ) 

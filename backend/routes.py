@@ -16,6 +16,7 @@ import re
 from bson.objectid import ObjectId
 from config import Config
 from email_service import send_email_via_emailjs
+from services.sendgrid_email_service import send_sendgrid_email
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 
@@ -338,26 +339,43 @@ def update_user_status(user_id):
             identity=user_to_update.to_dict()
         )
 
+        # --- NEW: Send email notification using SendGrid if role or status changed ---
         if old_role != new_role or old_status != new_status:
-            template_params = {
-                "user_name": user_to_update.full_name,
-                "user_email": user_to_update.email,  # Note: this is sent but not used in template content
-                "old_role": old_role,
-                "new_role": new_role,
-                "old_status": old_status,
-                "new_status": new_status,
-                "dashboard_url": Config.FRONTEND_URL + "/dashboard",
-                "title": "Role Assignment Update",
-            }
-            email_result = send_email_via_emailjs(
-                Config.EMAILJS_TEMPLATE_ROLE_ASSIGNED_ID,
-                template_params,
-                user_to_update.email,
+            subject = "Your Account Status Update on mAIple Conference Portal"
+            html_content = f"""
+            <html>
+            <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; margin: 20px auto; background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.05);">
+                    <h2 style="color: #6a0dad; text-align: center; margin-bottom: 20px;">Account Update Notification</h2>
+                    <p>Dear {user_to_update.full_name},</p>
+                    <p>This is to inform you that there has been an update to your account on the mAIple Conference Portal.</p>
+                    <p>
+                        Your role has been changed from <strong>{old_role}</strong> to <strong>{new_role}</strong>.
+                    </p>
+                    <p>
+                        Your account status has been changed from <strong>{old_status}</strong> to <strong>{new_status}</strong>.
+                    </p>
+                    <p> Please logout and log back in to see the changes reflected in your account.</p>
+                    
+                    <p>
+                        You can view your updated profile and dashboard by logging in here:
+                        <a href="{Config.FRONTEND_URL}/dashboard" style="display: inline-block; background-color: #6a0dad; color: #ffffff; padding: 10px 20px; border-radius: 5px; text-decoration: none; margin-top: 15px;">Go to Dashboard</a>
+                    </p>
+                    <p>If you have any questions, please do not hesitate to contact us.</p>
+                    <p>Best regards,<br>The mAIple Conference Team</p>
+                </div>
+            </body>
+            </html>
+            """
+            email_result = send_sendgrid_email(
+                user_to_update.email, subject, html_content
             )
+
             if not email_result["success"]:
                 current_app.logger.warning(
-                    f"Failed to send role/status update email to {user_to_update.email}: {email_result['message']}"
+                    f"Failed to send role/status update email to {user_to_update.email} via SendGrid: {email_result['message']}"
                 )
+        # --- END NEW ---
 
         return jsonify(
             {
