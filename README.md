@@ -1,4 +1,4 @@
-# Conference Portal Backend
+# Conference Portal
 
 A secure and robust backend for a conference management system, built with Flask and MongoDB. This API facilitates user authentication (login, signup, logout), protected access to user dashboards, and lays the groundwork for managing conference-related information.
 
